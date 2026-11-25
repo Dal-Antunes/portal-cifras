@@ -452,6 +452,10 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
   <section id="v-dados" data-view hidden>
     <h1 style="margin-bottom:6px">Compartilhar e guardar</h1>
     <p class="muted" style="margin:0 0 18px;max-width:68ch">Tudo funciona sem internet. As músicas que vêm no portal estão dentro deste arquivo. As que você adiciona ficam salvas neste aparelho e navegador. Para passar para os colegas, envie um arquivo pelo WhatsApp ou Drive.</p>
+      <div class="card" id="cFila" hidden style="margin-bottom:16px">
+      <div class="row"><h3 style="margin-right:auto">Aprovações pendentes</h3><button class="btn small" id="filaAtualizar">Atualizar</button></div>
+      <div id="fila" class="saved"></div>
+    </div>
     <div class="card" style="margin-bottom:16px"><div class="stat" id="stats"></div></div>
     <div class="cards">
       <div class="card">
@@ -474,6 +478,7 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
         <p class="hint" id="admTexto"></p>
         <div class="row" id="admForm"><input type="password" id="admPin" inputmode="numeric" autocomplete="off" placeholder="PIN" style="max-width:160px"><input type="password" id="admPin2" inputmode="numeric" autocomplete="off" placeholder="Repita o PIN" style="max-width:160px" hidden><button class="btn pri" id="admEntrar">Entrar</button></div>
         <div class="row" id="admLogado" hidden><button class="btn" id="admSair">Sair do modo coordenador</button><button class="btn" id="admTrocar">Trocar PIN</button></div>
+        <div class="row" id="admGoogle" hidden><button class="btn pri" id="gEntrar">Entrar com Google</button><button class="btn pri" id="gTornar" hidden>Tornar-me coordenador</button><button class="btn" id="gSair" hidden>Sair</button></div>
       </div>
       <div class="card" id="cGerar" hidden>
         <h3>Gerar portal atualizado</h3>
@@ -580,7 +585,9 @@ const st = {
   rep: ls.get('repAtual', {nome:'', data:'', itens:[]}),
   salvos: ls.get('reps', []),
   repsOcultos: ls.get('repsOcultos', []),
-  oficiais: ls.get('oficiais', []),   // versões tornadas oficiais neste aparelho (coordenador), até gerar o portal
+  oficiais: ls.get('oficiais', []),
+  nuvem: ls.get('nuvem', {musicas:{}, ultimo:0}),   // versões oficiais aprovadas no site
+  enviados: ls.get('enviados', {}),   // versões tornadas oficiais neste aparelho (coordenador), até gerar o portal
   admin: false,
   prefs: ls.get('prefs', {fs:15, exemplos:true}),
   filtro: {grupo:null, pasta:null, q:''},
@@ -591,6 +598,7 @@ const st = {
 function mapaOficial(){
   const map = new Map();
   for(const m of BASE.musicas||[]) map.set(m.id, m);
+  for(const m of Object.values(st.nuvem.musicas||{})){ if(m.removida) map.delete(m.id); else map.set(m.id, m); }
   for(const m of st.oficiais) map.set(m.id, m);
   return map;
 }
@@ -808,13 +816,20 @@ function desenharVersao(m){
   if(m.origem==='base'){ cls='of'; h='<span class="st">✓ Versão oficial</span>'; }
   else if(m.origem==='editada'){ cls='ed'; h='<span class="st">✎ Versão editada neste aparelho</span><button class="btn small" id="vVoltar">Voltar à versão oficial</button>'; }
   else { cls='ed'; h='<span class="st">✎ Música nova, só neste aparelho. Ainda não é oficial.</span>'; }
-  if(st.admin && m.origem!=='base') h+='<button class="btn pri small" id="vOficial">Tornar oficial</button>';
-  if(!st.admin && m.origem!=='base') h+='<span class="hint">Para virar oficial, envie em Compartilhar para o coordenador.</span>';
+  if(st.admin && m.origem!=='base') h+='<button class="btn pri small" id="vOficial">Tornar oficial'+(NUVEM.ok?' para todos':'')+'</button>';
+  if(!st.admin && m.origem!=='base'){
+    const env=st.enviados[m.id];
+    if(NUVEM.ok){
+      if(env && env.h===assinaturaM(m)) h+='<span class="hint">Enviada para aprovação em '+esc(new Date(env.t).toLocaleDateString('pt-BR'))+'. Aguardando o coordenador.</span>';
+      else h+='<span class="row" style="gap:6px"><input type="text" id="vAutor" placeholder="Seu nome" value="'+esc(ls.get('autor',''))+'" style="width:140px;padding:5px 8px"><button class="btn pri small" id="vEnviar">Enviar para aprovação</button></span>';
+    } else h+='<span class="hint">Para virar oficial, envie pelo site (com internet) ou em Compartilhar para o coordenador.</span>';
+  }
   box.className='versao '+cls; box.innerHTML=h;
 }
 $('#sVersao').addEventListener('click', e=>{
   const m=porId(st.atual); if(!m) return;
   const v=e.target.closest('#vVoltar'), o=e.target.closest('#vOficial');
+  if(e.target.closest('#vEnviar')) return enviarAprovacao(m);
   if(v){
     if(!v.classList.contains('armed')){ v.classList.add('armed','danger'); v.textContent='Confirmar: apagar minha edição'; setTimeout(()=>{ if(v.isConnected){ v.classList.remove('armed','danger'); v.textContent='Voltar à versão oficial'; } },4000); return; }
     st.locais=st.locais.filter(x=>x.id!==m.id); salvarLocais(); st.transp=0;
@@ -823,6 +838,7 @@ $('#sVersao').addEventListener('click', e=>{
   if(o && st.admin){
     if(!o.classList.contains('armed')){ o.classList.add('armed'); o.textContent='Confirmar: tornar oficial'; setTimeout(()=>{ if(o.isConnected){ o.classList.remove('armed'); o.textContent='Tornar oficial'; } },4000); return; }
     const c=limpa(m); c.oficializadoEm=new Date().toISOString().slice(0,10);
+    if(NUVEM.ok){ publicarOficial(c, 'coordenador').then(()=>{ st.locais=st.locais.filter(x=>x.id!==m.id); salvarLocais(); toast('Agora é a versão oficial para todo o ministério.'); abrirMusica(m.id); }).catch(err=>toast(erroNuvem(err))); return; }
     st.oficiais=st.oficiais.filter(x=>x.id!==m.id); st.oficiais.push(c); ls.set('oficiais',st.oficiais);
     st.locais=st.locais.filter(x=>x.id!==m.id); salvarLocais();
     st.ocultas=st.ocultas.filter(x=>x!==m.id); ls.set('ocultas',st.ocultas);
@@ -876,9 +892,13 @@ $('#imprimir').onclick=()=>{ const m=porId(st.atual); imprimir([{m, s:st.transp}
 function desarmar(b){ b.classList.remove('armed'); b.textContent='Excluir'; }
 $('#excluir').onclick=e=>{
   const b=e.currentTarget;
-  if(!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent='Confirmar exclusão'; setTimeout(()=>desarmar(b),4000); return; }
+  if(!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent= NUVEM.ok&&st.admin ? 'Confirmar: excluir para todos' : 'Confirmar exclusão'; setTimeout(()=>desarmar(b),4000); return; }
   const m=porId(st.atual); if(!m) return;
   const naBase=mapaOficial().has(m.id);
+  if(NUVEM.ok && st.admin && naBase){
+    removerOficial(m).then(()=>{ st.locais=st.locais.filter(x=>x.id!==m.id); salvarLocais(); st.rep.itens=st.rep.itens.filter(i=>i.id!==m.id); salvarRep(); toast('“'+m.titulo+'” foi excluída para todos.'); location.hash='#inicio'; }).catch(err=>toast(erroNuvem(err)));
+    return;
+  }
   st.locais = st.locais.filter(x=>x.id!==m.id);
   if(naBase && !st.ocultas.includes(m.id)){ st.ocultas.push(m.id); ls.set('ocultas',st.ocultas); }
   salvarLocais();
@@ -1356,6 +1376,7 @@ function pinAtual(){ const l=ls.get('pin',null); if(l && (ls.get('pinOrigem',nul
 st.admin = !!pinAtual() && ls.get('admin', null) === pinAtual();
 let trocandoPin=false;
 function renderAdmin(){
+  if(NUVEM.ok){ renderAdminNuvem(); return; }
   const tem=!!pinAtual(), criando = !tem || trocandoPin;
   $('#admTexto').innerHTML = st.admin && !trocandoPin
     ? 'Você está no modo coordenador neste aparelho. Pode tornar versões oficiais e gerar o portal atualizado.'
@@ -1390,6 +1411,137 @@ function renderDados(){
 }
 $('#iGrupo').addEventListener('change', renderDados);
 
+/* ---------- Aprovação pelo site (Firebase) ---------- */
+const NUVEM = {ok:false, db:null, auth:null, user:null, admin:false, semAdmin:false, fila:[]};
+function assinaturaM(m){ const c=JSON.stringify([m.titulo,m.artista,m.tom,m.cifra,m.obs,locs(m)]); let h=0; for(let i=0;i<c.length;i++) h=(Math.imul(h,31)+c.charCodeAt(i))|0; return h; }
+function paraNuvem(m){ const c=JSON.parse(JSON.stringify(limpa(m))); delete c._excluida; delete c.atualizado; delete c.oficializadoEm; return c; }
+function erroNuvem(e){ const c=(e&&e.code)||''; if(c.includes('permission')) return 'Sem permissão. Entre como coordenador e tente de novo.'; if(c.includes('unavailable')||navigator.onLine===false) return 'Sem internet agora. Tente de novo quando estiver online.'; return 'Não deu certo ('+(c||'erro')+'). Tente de novo.'; }
+function carregarScript(src){ return new Promise((ok,erro)=>{ const sc=document.createElement('script'); sc.src=src; sc.onload=ok; sc.onerror=erro; document.head.appendChild(sc); }); }
+function redesenhar(){
+  if(!$('#v-inicio').hidden) renderBiblioteca();
+  if(!$('#v-musica').hidden && st.atual && porId(st.atual)){ abrirMusica(st.atual); }
+  if(!$('#v-dados').hidden) renderDados();
+  renderAdmin();
+}
+async function iniciarNuvem(){
+  if(!/^https?:$/.test(location.protocol) || EMBUTIDO) return;
+  try{ if(!window.FIREBASE_CONFIG) await carregarScript('firebase-config.js'); }catch(e){ return; }
+  if(!window.FIREBASE_CONFIG || !window.FIREBASE_CONFIG.projectId) return;
+  try{ for(const f of ['firebase-app-compat.js','firebase-auth-compat.js','firebase-firestore-compat.js']) await carregarScript('vendor/'+f); }catch(e){ return; }
+  try{
+    firebase.initializeApp(window.FIREBASE_CONFIG);
+    NUVEM.db=firebase.firestore(); NUVEM.auth=firebase.auth(); NUVEM.ok=true;
+  }catch(e){ return; }
+  st.admin=false;
+  NUVEM.auth.onAuthStateChanged(async u=>{ NUVEM.user=u; await checarAdmin(); st.admin=NUVEM.admin; if(NUVEM.admin) carregarFila(); redesenhar(); });
+  NUVEM.auth.getRedirectResult().catch(()=>{});
+  sincronizar(); redesenhar();
+  window.addEventListener('online', sincronizar);
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ sincronizar(); if(NUVEM.admin) carregarFila(); } });
+}
+async function sincronizar(){
+  if(!NUVEM.ok || navigator.onLine===false) return;
+  try{
+    let q=NUVEM.db.collection('musicas'); const desde=st.nuvem.ultimo||0;
+    if(desde) q=q.where('atualizadoEm','>',firebase.firestore.Timestamp.fromMillis(desde));
+    const snap=await q.get(); let n=0;
+    snap.forEach(d=>{ const m=d.data(); const t=m.atualizadoEm&&m.atualizadoEm.toMillis?m.atualizadoEm.toMillis():0; delete m.atualizadoEm; m.id=d.id; st.nuvem.musicas[d.id]=m; if(t>st.nuvem.ultimo) st.nuvem.ultimo=t; n++; });
+    if(n){
+      ls.set('nuvem',st.nuvem);
+      // edição local igual à nova versão oficial: some sozinha
+      const of=mapaOficial(); const antes=st.locais.length;
+      st.locais=st.locais.filter(x=>{ const o=of.get(x.id); return !(o && assinaturaM(o)===assinaturaM(x)); });
+      if(st.locais.length!==antes) salvarLocais();
+      redesenhar(); if(desde) toast(n+' música(s) atualizada(s) pelo coordenador.');
+    }
+  }catch(e){}
+}
+async function checarAdmin(){
+  NUVEM.admin=false; NUVEM.semAdmin=false;
+  if(!NUVEM.user) return;
+  try{ const d=await NUVEM.db.doc('config/admin').get(); if(!d.exists) NUVEM.semAdmin=true; else NUVEM.admin = d.data().uid===NUVEM.user.uid; }
+  catch(e){ NUVEM.admin=false; }
+}
+function renderAdminNuvem(){
+  const u=NUVEM.user;
+  $('#admForm').hidden=true; $('#admLogado').hidden=true; $('#admGoogle').hidden=false;
+  $('#gEntrar').hidden=!!u; $('#gSair').hidden=!u; $('#gTornar').hidden=!(u && NUVEM.semAdmin);
+  $('#admTexto').innerHTML = !u ? 'O coordenador entra com a conta Google para aprovar as músicas enviadas pelo ministério. Os outros membros não precisam entrar.'
+    : NUVEM.admin ? 'Você está como coordenador (<b>'+esc(u.email||'')+'</b>). As aprovações aparecem abaixo.'
+    : NUVEM.semAdmin ? 'Ainda não há coordenador. Toque em <b>Tornar-me coordenador</b> para que esta conta ('+esc(u.email||'')+') seja a única que aprova.'
+    : 'Esta conta ('+esc(u.email||'')+') não é a do coordenador.';
+  $('#cGerar').hidden=!NUVEM.admin; $('#cFila').hidden=!NUVEM.admin;
+  const n=NUVEM.admin?NUVEM.fila.length:0;
+  document.querySelectorAll('[data-tab="dados"]').forEach(a=>a.innerHTML='Compartilhar'+(NUVEM.admin?' <span class="badge" title="Aprovações pendentes">'+(n||'★')+'</span>':''));
+  renderFila();
+}
+$('#gEntrar').onclick=async()=>{
+  const prov=new firebase.auth.GoogleAuthProvider();
+  try{ await NUVEM.auth.signInWithPopup(prov); }
+  catch(e){ if(/popup|operation-not-supported|web-storage/.test(e.code||'')){ try{ await NUVEM.auth.signInWithRedirect(prov); }catch(e2){ toast(erroNuvem(e2)); } } else if(!/cancelled|closed/.test(e.code||'')) toast(erroNuvem(e)); }
+};
+$('#gSair').onclick=()=>{ NUVEM.auth.signOut(); };
+$('#gTornar').onclick=async()=>{
+  try{ await NUVEM.db.doc('config/admin').set({uid:NUVEM.user.uid, email:NUVEM.user.email||'', criadoEm:firebase.firestore.FieldValue.serverTimestamp()}); await checarAdmin(); st.admin=NUVEM.admin; carregarFila(); toast('Pronto, você é o coordenador.'); redesenhar(); }
+  catch(e){ toast('Já existe um coordenador. '+erroNuvem(e)); await checarAdmin(); redesenhar(); }
+};
+async function enviarAprovacao(m){
+  const nome=($('#vAutor')&&$('#vAutor').value.trim())||'';
+  if(!nome){ toast('Escreva seu nome para o coordenador saber quem enviou.'); $('#vAutor')&&$('#vAutor').focus(); return; }
+  ls.set('autor',nome);
+  try{
+    await NUVEM.db.collection('pendentes').add({tipo: oficialDe(m.id)?'edicao':'nova', musicaId:m.id, musica:paraNuvem(m), autor:nome.slice(0,60), enviadoEm:firebase.firestore.FieldValue.serverTimestamp()});
+    st.enviados[m.id]={t:Date.now(), h:assinaturaM(m)}; ls.set('enviados',st.enviados);
+    toast('Enviada para aprovação. Obrigado, '+nome.split(' ')[0]+'!'); desenharVersao(m);
+  }catch(e){ toast(erroNuvem(e)); }
+}
+async function carregarFila(){
+  if(!NUVEM.admin) return;
+  try{ const snap=await NUVEM.db.collection('pendentes').orderBy('enviadoEm').get(); NUVEM.fila=[]; snap.forEach(d=>NUVEM.fila.push({id:d.id, ...d.data()})); }
+  catch(e){ NUVEM.fila=[]; }
+  renderAdminNuvem();
+}
+function renderFila(){
+  const box=$('#fila'); if(!box) return;
+  if(!NUVEM.admin){ box.innerHTML=''; return; }
+  box.innerHTML = NUVEM.fila.length ? NUVEM.fila.map((p,k)=>{
+    const data=p.enviadoEm&&p.enviadoEm.toDate?p.enviadoEm.toDate().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+    return '<div class="s"><div><b>'+esc(p.musica&&p.musica.titulo||'Sem título')+'</b><span class="small muted">'+esc([p.tipo==='nova'?'Música nova':'Edição', 'por '+(p.autor||'?'), data].filter(Boolean).join(' · '))+'</span></div>'
+      +'<button class="btn small" data-fver="'+k+'">Ver</button><button class="btn pri small" data-faprovar="'+k+'">Aprovar</button><button class="btn small danger" data-frecusar="'+k+'">Recusar</button></div>';
+  }).join('') : '<p class="hint">Nenhuma música esperando aprovação.</p>';
+}
+async function publicarOficial(m, autor){
+  const c=paraNuvem(m); c.atualizadoEm=firebase.firestore.FieldValue.serverTimestamp(); if(autor) c.aprovadoDe=String(autor).slice(0,60);
+  await NUVEM.db.collection('musicas').doc(m.id).set(c);
+  await sincronizar();
+}
+async function removerOficial(m){
+  await NUVEM.db.collection('musicas').doc(m.id).set({id:m.id, titulo:m.titulo, removida:true, atualizadoEm:firebase.firestore.FieldValue.serverTimestamp()});
+  await sincronizar();
+}
+async function aprovar(p){ await publicarOficial({...p.musica, id:p.musicaId}, p.autor); await NUVEM.db.collection('pendentes').doc(p.id).delete(); await carregarFila(); toast('“'+(p.musica.titulo||'')+'” aprovada. Já vale para todos.'); }
+async function recusar(p){ await NUVEM.db.collection('pendentes').doc(p.id).delete(); await carregarFila(); toast('Envio recusado.'); }
+function verPendente(p){
+  const md=$('#modal'); const of=oficialDe(p.musicaId); const prop={...p.musica, id:p.musicaId};
+  md.innerHTML='<div class="box" role="dialog" aria-modal="true" aria-label="Ver envio" style="max-width:860px"><div class="row"><h3 style="margin-right:auto">'+esc(prop.titulo||'')+'</h3><span class="small muted">'+esc((p.tipo==='nova'?'Música nova':'Edição')+' por '+(p.autor||'?'))+'</span></div>'
+    +'<div class="small muted">'+esc([prop.artista, prop.tom?'Tom '+prop.tom:'', locs(prop).map(l=>rotuloLoc(l,true)).join('; ')].filter(Boolean).join(' · '))+(prop.obs?'<br>'+esc(prop.obs):'')+'</div>'
+    +(of?'<div class="row"><button class="btn small pri" data-vista="nova">Versão enviada</button><button class="btn small" data-vista="of">Versão oficial atual</button></div>':'')
+    +'<div class="sheet" style="flex:1;overflow:auto;padding:12px"><div class="cifra" id="mdCifra" style="--fs:13px">'+renderCifra(prop,0)+'</div></div>'
+    +'<div class="row"><button class="btn pri" id="mdAprovar">Aprovar</button><button class="btn danger" id="mdRecusar">Recusar</button><button class="btn" id="mdFechar">Fechar</button></div></div>';
+  md.hidden=false;
+  md.querySelectorAll('[data-vista]').forEach(b=>b.onclick=()=>{ md.querySelectorAll('[data-vista]').forEach(x=>x.classList.toggle('pri',x===b)); $('#mdCifra').innerHTML=renderCifra(b.dataset.vista==='of'?of:prop,0); });
+  $('#mdFechar').onclick=()=>md.hidden=true;
+  $('#mdAprovar').onclick=()=>{ md.hidden=true; aprovar(p).catch(e=>toast(erroNuvem(e))); };
+  $('#mdRecusar').onclick=()=>{ md.hidden=true; recusar(p).catch(e=>toast(erroNuvem(e))); };
+}
+$('#fila').addEventListener('click', e=>{
+  const v=e.target.closest('[data-fver]'), a=e.target.closest('[data-faprovar]'), r=e.target.closest('[data-frecusar]');
+  if(v) verPendente(NUVEM.fila[+v.dataset.fver]);
+  if(a){ a.disabled=true; aprovar(NUVEM.fila[+a.dataset.faprovar]).catch(err=>{ a.disabled=false; toast(erroNuvem(err)); }); }
+  if(r){ if(!r.classList.contains('armed')){ r.classList.add('armed'); r.textContent='Confirmar'; return; } recusar(NUVEM.fila[+r.dataset.frecusar]).catch(err=>toast(erroNuvem(err))); }
+});
+$('#filaAtualizar').onclick=()=>carregarFila();
+
 /* ---------- Impressão ---------- */
 function imprimir(lista, titulo){
   $('#impressao').innerHTML = lista.map(({m,s})=>'<div class="pm"><h2>'+esc(m.titulo)+'</h2><div class="pmeta">'+esc([m.artista, m.momento&&m.grupo==='missa'?m.momento:'', 'Tom '+tomTransposto(m,s)].filter(Boolean).join(' · '))+(titulo?' · '+esc(titulo):'')+'</div><div class="cifra">'+renderCifra(m,s)+'</div></div>').join('');
@@ -1399,6 +1551,7 @@ function imprimir(lista, titulo){
 atualizarBadge();
 renderAdmin();
 rota();
+iniciarNuvem();
 
 /* App instalável: funciona offline e se atualiza sozinho quando há internet (só no site, não no arquivo). */
 if('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !EMBUTIDO){

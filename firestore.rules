@@ -1,0 +1,40 @@
+rules_version = '2';
+// Regras do Portal de Cifras.
+// - Todos leem as músicas oficiais.
+// - Qualquer pessoa pode enviar uma música para aprovação (só entra na fila).
+// - Só o coordenador (a conta Google gravada em config/admin) aprova, recusa, edita ou exclui.
+// - A primeira conta que tocar em "Tornar-me coordenador" vira o coordenador; depois disso ninguém mais consegue.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/config/admin)
+        && get(/databases/$(database)/documents/config/admin).data.uid == request.auth.uid;
+    }
+    match /config/admin {
+      allow read: if request.auth != null && (resource == null || resource.data.uid == request.auth.uid);
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'criadoEm']);
+      allow update, delete: if isAdmin();
+    }
+    match /musicas/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /pendentes/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['tipo', 'musicaId', 'musica', 'autor', 'enviadoEm'])
+        && request.resource.data.tipo in ['nova', 'edicao']
+        && request.resource.data.musicaId is string && request.resource.data.musicaId.size() <= 40
+        && request.resource.data.autor is string && request.resource.data.autor.size() <= 60
+        && request.resource.data.musica is map
+        && request.resource.data.musica.titulo is string && request.resource.data.musica.titulo.size() <= 200
+        && request.resource.data.musica.cifra is string && request.resource.data.musica.cifra.size() <= 60000
+        && request.resource.data.enviadoEm == request.time;
+      allow read, update, delete: if isAdmin();
+    }
+    match /{caminho=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,7 +1,8 @@
 // Guarda o portal no aparelho para funcionar sem internet.
 // Página: tenta a internet primeiro (para pegar a versão nova) e usa a cópia guardada se estiver offline.
-const VERSAO = 'cifras-2026-11-25-1';
-const ARQUIVOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+const VERSAO = 'cifras-2026-11-25-2';
+const ARQUIVOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png',
+  './vendor/firebase-app-compat.js', './vendor/firebase-auth-compat.js', './vendor/firebase-firestore-compat.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSAO).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting()));
@@ -24,6 +25,10 @@ self.addEventListener('fetch', e => {
         return (await cache.match('./index.html')) || (await cache.match('./')) || Response.error();
       }
     })());
+    return;
+  }
+  if (req.url.endsWith('firebase-config.js')) {
+    e.respondWith(fetch(req).then(r => { const c = r.clone(); caches.open(VERSAO).then(x => x.put(req, c)); return r; }).catch(() => caches.match(req)));
     return;
   }
   e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {
