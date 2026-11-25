@@ -1412,7 +1412,8 @@ function renderDados(){
   renderAdmin();
   const l=todas(); const nLocal=l.filter(m=>m.origem!=='base').length;
   $('#stats').innerHTML = '<div><b>'+l.length+'</b><span class="small muted">músicas no portal</span></div><div><b>'+nLocal+'</b><span class="small muted">edições não oficiais neste aparelho</span></div><div><b>'+repsTodos().length+'</b><span class="small muted">repertórios salvos</span></div>'
-    + '<div><b>'+esc(dataBR(BASE.geradoEm)||'-')+'</b><span class="small muted">versão do portal</span></div>';
+    + '<div><b>'+esc(dataBR(BASE.geradoEm)||'-')+'</b><span class="small muted">músicas do portal</span></div>'
+    + '<div><b>4</b><span class="small muted">versão do app</span></div>';
   $('#iGrupo').innerHTML = opcoesGrupo($('#iGrupo').value||'missa');
   $('#dlPastasI').innerHTML = pastasDe($('#iGrupo').value||'missa',l).map(p=>'<option value="'+esc(p)+'">').join('');
   $('#mostrarEx').checked = !!st.prefs.exemplos;
