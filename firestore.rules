@@ -2,6 +2,7 @@ rules_version = '2';
 // Regras do Portal de Cifras.
 // - Todos leem as músicas oficiais.
 // - Qualquer pessoa pode enviar uma música para aprovação (só entra na fila).
+// - Todos leem os repertórios publicados; só o coordenador publica ou apaga.
 // - Só o coordenador (a conta Google gravada em config/admin) aprova, recusa, edita ou exclui.
 // - A primeira conta que tocar em "Tornar-me coordenador" vira o coordenador; depois disso ninguém mais consegue.
 service cloud.firestore {
@@ -19,6 +20,10 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
     match /musicas/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /repertorios/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }

@@ -1,6 +1,6 @@
 // Guarda o portal no aparelho para funcionar sem internet.
 // Página: tenta a internet primeiro (para pegar a versão nova) e usa a cópia guardada se estiver offline.
-const VERSAO = 'cifras-2026-11-25-2';
+const VERSAO = 'cifras-2026-11-25-3';
 const ARQUIVOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   './vendor/firebase-app-compat.js', './vendor/firebase-auth-compat.js', './vendor/firebase-firestore-compat.js'];
 
