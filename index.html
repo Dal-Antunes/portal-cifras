@@ -204,6 +204,17 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
 .quickres{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--surface);border:1px solid var(--line);border-radius:8px;max-height:280px;overflow:auto;z-index:5;box-shadow:0 8px 24px rgba(0,0,0,.12)}
 .quickres button{all:unset;display:flex;gap:8px;align-items:center;padding:8px 10px;cursor:pointer;width:calc(100% - 20px);font-size:.92rem}
 .quickres button:hover,.quickres button:focus-visible{background:var(--sunk)}
+.rephead{display:flex;gap:8px;align-items:flex-start;margin-bottom:12px}
+.rephead .repaberto{flex:1;margin:0}
+.repmenu{position:relative;flex:none}
+#repMais{font-size:1.25rem;line-height:1;min-width:40px;min-height:38px;justify-content:center}
+.repmenulista{position:absolute;right:0;top:calc(100% + 6px);z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.16);padding:6px;display:flex;flex-direction:column;gap:2px;min-width:250px}
+.repmenulista[hidden]{display:none}
+.repmenulista .btn{border:0;background:none;justify-content:flex-start;width:100%;padding:10px 12px;white-space:normal;text-align:left}
+.repmenulista .btn:hover:not(:disabled){background:var(--sunk)}
+.repmenulista .btn:disabled{opacity:.45}
+.repmenulista hr{border:0;border-top:1px solid var(--line);margin:4px 6px}
+.telaseq{width:100%;justify-content:center;margin-bottom:12px;padding:10px 12px}
 .repaberto{font-size:.88rem;color:var(--muted);margin:-2px 0 12px;padding:8px 10px;border-radius:8px;background:var(--sunk)}
 .repaberto b{color:var(--fg)}
 .salvarlinha{margin-top:10px;padding-top:12px;border-top:1px solid var(--line)}
@@ -458,8 +469,23 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
   <!-- REPERTÓRIO -->
   <section id="v-repertorio" data-view hidden>
     <div class="rep">
-      <div class="card">
-        <div class="repaberto" id="repInfo"></div>
+      <div class="card" id="repCard">
+        <div class="rephead">
+          <div class="repaberto" id="repInfo"></div>
+          <div class="repmenu">
+            <button class="btn icon" id="repMais" aria-expanded="false" aria-haspopup="true" aria-label="Mais opções do repertório" title="Mais opções">⋯</button>
+            <div class="repmenulista" id="repMenu" hidden>
+              <button class="btn" id="tocar">▶ Tocar em sequência</button>
+              <button class="btn" id="copiarLista">Copiar lista (WhatsApp)</button>
+              <button class="btn" id="enviarRep">Enviar arquivo do repertório</button>
+              <button class="btn" id="imprimirRep" data-print>Imprimir tudo</button>
+              <hr>
+              <button class="btn" id="salvarRep">Salvar este</button>
+              <button class="btn" id="salvarNovo" hidden>Salvar como novo</button>
+              <button class="btn" id="novoRep">Começar outro</button>
+            </div>
+          </div>
+        </div>
         <div class="repfields">
           <div class="field"><label for="rNome">Nome do repertório</label><input type="text" id="rNome" placeholder="Ex.: Missa do 1º Domingo do Advento"></div>
           <div class="field"><label for="rData">Data</label><input type="date" id="rData"></div>
@@ -469,20 +495,9 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
           <input type="search" id="rBusca" placeholder="Digite o nome da música" autocomplete="off">
           <div class="quickres" id="rRes" hidden></div>
         </div>
+        <button class="btn pri telaseq" id="tocarTela">⛶ Tela cheia em sequência</button>
         <ol class="seq" id="seq"></ol>
         <div class="empty" id="seqVazio" hidden>Nenhuma música ainda. Busque acima ou toque em <b>+</b> na biblioteca.</div>
-        <div class="row" style="margin-top:14px">
-          <button class="btn pri" id="tocar">▶ Tocar em sequência</button>
-          <button class="btn pri" id="tocarTela">⛶ Tela cheia em sequência</button>
-          <button class="btn" id="copiarLista">Copiar lista (WhatsApp)</button>
-          <button class="btn" id="enviarRep">Enviar arquivo do repertório</button>
-          <button class="btn" id="imprimirRep" data-print>Imprimir tudo</button>
-        </div>
-        <div class="row salvarlinha">
-          <button class="btn pri" id="salvarRep">Salvar este</button>
-          <button class="btn" id="salvarNovo" hidden>Salvar como novo</button>
-          <button class="btn" id="novoRep">Começar outro</button>
-        </div>
       </div>
       <div class="card" id="vivoCard">
         <h3>📡 Modo Ao Vivo</h3>
@@ -1158,6 +1173,11 @@ function salvarRepertorio(comoNovo){
     publicarRep(copia).then(()=>{ st.salvos=st.salvos.filter(r=>r.id!==copia.id); ls.set('reps',st.salvos); toast('Repertório '+msg+' para todo o ministério.'); renderRep(); }).catch(e=>toast('Salvo só neste aparelho. '+erroNuvem(e)));
   } else toast('Repertório '+msg+' neste aparelho.');
 }
+function fecharRepMenu(){ $('#repMenu').hidden=true; $('#repMais').setAttribute('aria-expanded','false'); }
+$('#repMais').onclick=e=>{ e.stopPropagation(); const ab=$('#repMenu').hidden; $('#repMenu').hidden=!ab; $('#repMais').setAttribute('aria-expanded', ab); };
+$('#repMenu').addEventListener('click', e=>{ if(e.target.closest('button')) setTimeout(fecharRepMenu,0); });
+document.addEventListener('click', e=>{ if(!$('#repMenu').hidden && !e.target.closest('.repmenu')) fecharRepMenu(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && !$('#repMenu').hidden) fecharRepMenu(); });
 $('#salvarRep').onclick=()=>salvarRepertorio(false);
 $('#salvarNovo').onclick=()=>salvarRepertorio(true);
 $('#novoRep').onclick=()=>{ st.rep={nome:'',data:'',itens:[]}; salvarRep(); renderRep(); $('#rNome').focus(); };
@@ -1900,7 +1920,7 @@ function renderDados(){
 $('#iGrupo').addEventListener('change', renderDados);
 
 /* ---------- Aprovação pelo site (Firebase) ---------- */
-const VERSAO_APP = 14;
+const VERSAO_APP = 15;
 const NUVEM = {ok:false, db:null, auth:null, user:null, admin:false, semAdmin:false, fila:[]};
 function assinaturaM(m){ const c=JSON.stringify([m.titulo,m.artista,m.tom,m.cifra,m.obs,locs(m)]); let h=0; for(let i=0;i<c.length;i++) h=(Math.imul(h,31)+c.charCodeAt(i))|0; return h; }
 function paraNuvem(m){ const c=JSON.parse(JSON.stringify(limpa(m))); delete c._excluida; delete c.atualizado; delete c.oficializadoEm; return c; }
