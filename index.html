@@ -343,7 +343,7 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
   .seq li{flex-wrap:wrap}
   .seq .ctr{width:100%;justify-content:flex-start;padding-left:0;gap:6px}
   .seq .handle{display:none}
-  .rep .card:last-child{order:-1}
+  /* o repertório atual vem primeiro: é o que se abre para tocar */
   #fila .s{flex-wrap:wrap}
   #fila .s div{flex:1 1 100%}
   .fontes .btn{white-space:normal;text-align:left}
@@ -816,7 +816,7 @@ const celular = () => window.matchMedia('(max-width:760px)').matches;
 /* ---------- Navegação ---------- */
 let vistaAtual=null, rolagemInicio=0;
 function rota(){
-  const h = (location.hash||'#inicio').slice(1);
+  const h = (location.hash||'#repertorio').slice(1);   // sem endereço: abre no Repertório, que é o que a maioria quer na hora de tocar
   let v = h, id=null;
   if(h.startsWith('m-')){ v='musica'; id=h.slice(2); }
   if(!document.getElementById('v-'+v)) v='inicio';
@@ -1900,7 +1900,7 @@ function renderDados(){
 $('#iGrupo').addEventListener('change', renderDados);
 
 /* ---------- Aprovação pelo site (Firebase) ---------- */
-const VERSAO_APP = 13;
+const VERSAO_APP = 14;
 const NUVEM = {ok:false, db:null, auth:null, user:null, admin:false, semAdmin:false, fila:[]};
 function assinaturaM(m){ const c=JSON.stringify([m.titulo,m.artista,m.tom,m.cifra,m.obs,locs(m)]); let h=0; for(let i=0;i<c.length;i++) h=(Math.imul(h,31)+c.charCodeAt(i))|0; return h; }
 function paraNuvem(m){ const c=JSON.parse(JSON.stringify(limpa(m))); delete c._excluida; delete c.atualizado; delete c.oficializadoEm; return c; }
