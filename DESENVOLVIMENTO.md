@@ -38,3 +38,7 @@ As 230 músicas da base estão dentro do `index.html` (`<script id="dados-base">
 - Suba `VERSAO_APP` em `index.html` e `VERSAO` em `sw.js`, senão os celulares não baixam a versão nova.
 - O arquivo único offline (`portal-cifras.html`) é gerado pelo próprio app em Compartilhar → Gerar portal atualizado.
 - Regras do Firestore (`firestore.rules`) não são publicadas pelo GitHub: no oficial quem publica é o Dal, no console do Firebase.
+
+## Proteção do main
+
+O ramo `main` tem a regra "Proteger main": não pode ser apagado nem reescrito (force push), e só recebe mudanças por pull request com 1 aprovação. Somente o administrador do repositório (o Dal) pode passar por cima dessa regra.
