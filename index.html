@@ -152,6 +152,7 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
 .versao .st{font-weight:600;margin-right:auto}
 .versao.of .st{color:var(--ok)}
 .versao.ed .st{color:var(--chord)}
+.versao .vtom{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px dashed var(--line);color:var(--fg)}
 .adm{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;color:var(--accent);font-weight:600}
 .tagbox{display:flex;flex-direction:column;gap:8px}
 .tagbox .lbl{font-size:.8rem;font-weight:600;color:var(--muted);margin-right:2px}
@@ -689,6 +690,26 @@ function transToken(tok,s,flat){
   const c = core.match(CHORD); if(!c) return tok;
   return m[1] + transNota(c[1],s,flat) + c[2] + (c[3]?'/'+transNota(c[3],s,flat):'') + m[3];
 }
+/* Transpõe o texto da cifra (como foi digitado), para salvar a música num tom novo. */
+function transporTexto(txt,s,flat){
+  return String(txt||'').split('\n').map(raw=>{
+    const l=raw.replace(/\t/g,'    ');
+    const br=[...l.matchAll(/\[([^\]]+)\]/g)];
+    if(br.length && br.every(x=>ehAcorde(x[1]))) return l.replace(/\[([^\]]+)\]/g,(a,c)=>'['+transToken(c,s,flat)+']');
+    if(linhaDeAcordes(l)) return transLinha(l,s,flat);
+    return raw;
+  }).join('\n');
+}
+function transpostaDe(m,s){ const c=limpa(m); c.cifra=transporTexto(m.cifra,s,usaBemol(m,s)); c.tom=tomTransposto(m,s)||c.tom||''; c.atualizado=Date.now(); return c; }
+function raizTom(m){ const t=m&&tomBase(m); const c=t&&t.match(CHORD); return c?nota(c[1]):-1; }
+const meioTom = x => (((x%12)+18)%12)-6;
+/* Quando o tom original de uma música muda, os repertórios guardados continuam no mesmo tom de antes. */
+function ajustarReps(id,d){
+  d=((d%12)+12)%12; if(!d) return;
+  const aj=r=>{ let mud=false; for(const i of (r&&r.itens)||[]) if(i.id===id){ i.s=meioTom(i.s-d); mud=true; } return mud; };
+  if(aj(st.rep)) salvarRep();
+  let mud=false; for(const r of st.salvos) if(aj(r)) mud=true; if(mud) ls.set('reps',st.salvos);
+}
 function transLinha(l,s,flat){
   if(!s) return l;
   let out='', re=/\S+/g, m;
@@ -877,12 +898,47 @@ function desenharVersao(m){
       else h+='<span class="row" style="gap:6px"><input type="text" id="vAutor" placeholder="Seu nome" value="'+esc(ls.get('autor',''))+'" style="width:140px;padding:5px 8px"><button class="btn pri small" id="vEnviar">Enviar para aprovação</button></span>';
     } else h+='<span class="hint">Para virar oficial, envie pelo site (com internet) ou em Compartilhar para o coordenador.</span>';
   }
+  if(meioTom(st.transp)){
+    const nt=tomTransposto(m,st.transp)||'';
+    h += '<div class="vtom"><span>Tom mudado para <span class="key">'+esc(nt)+'</span></span>'
+      + (st.admin ? '<button class="btn pri small" id="vTom">Tornar oficial em '+esc(nt)+'</button>'
+                  : '<button class="btn pri small" id="vTomLocal">Salvar em '+esc(nt)+(NUVEM.ok?' e enviar para aprovação':'')+'</button>')
+      + '</div>';
+  }
   box.className='versao '+cls; box.innerHTML=h;
 }
 $('#sVersao').addEventListener('click', e=>{
   const m=porId(st.atual); if(!m) return;
   const v=e.target.closest('#vVoltar'), o=e.target.closest('#vOficial');
   if(e.target.closest('#vEnviar')) return enviarAprovacao(m);
+  const vt=e.target.closest('#vTom'), vl=e.target.closest('#vTomLocal');
+  if(vl){
+    const s=st.transp, c=transpostaDe(m,s);
+    const i=st.locais.findIndex(x=>x.id===m.id); if(i>=0) st.locais[i]=c; else st.locais.push(c); salvarLocais();
+    st.transp=0; ajustarReps(m.id,s);
+    toast(NUVEM.ok ? 'Salva em '+c.tom+' no seu aparelho. Agora escreva seu nome e toque em Enviar para aprovação.' : 'Salva em '+c.tom+' no seu aparelho. Envie em Compartilhar para o coordenador.');
+    abrirMusica(m.id); const a=$('#vAutor'); if(a && !a.value) a.focus();
+    return;
+  }
+  if(vt && st.admin){
+    if(!vt.classList.contains('armed')){ vt.classList.add('armed'); const t0=vt.textContent; vt.textContent='Confirmar: '+t0.toLowerCase(); setTimeout(()=>{ if(vt.isConnected){ vt.classList.remove('armed'); vt.textContent=t0; } },4000); return; }
+    vt.disabled=true;
+    const s=st.transp, c=transpostaDe(m,s); c.oficializadoEm=new Date().toISOString().slice(0,10); delete c.atualizado;
+    const d=raizTom(c)-raizTom(m);
+    if(NUVEM.ok){
+      publicarOficial(c,'coordenador').then(()=>{
+        st.locais=st.locais.filter(x=>x.id!==m.id); salvarLocais(); st.transp=0;
+        // repertórios publicados para todos: mantém o tom em que estavam
+        for(const r of (st.nuvem.reps||[])) if(r.itens.some(i=>i.id===m.id)) publicarRep({...r, itens:r.itens.map(i=>i.id===m.id?{...i, s:meioTom(i.s-d)}:i)}).catch(()=>{});
+        toast('Pronto. O tom oficial agora é '+c.tom+' para todo o ministério.'); abrirMusica(m.id);
+      }).catch(err=>{ vt.disabled=false; toast(erroNuvem(err)); });
+      return;
+    }
+    st.oficiais=st.oficiais.filter(x=>x.id!==m.id); st.oficiais.push(c); ls.set('oficiais',st.oficiais);
+    st.locais=st.locais.filter(x=>x.id!==m.id); salvarLocais(); st.transp=0; ajustarReps(m.id,d);
+    toast('O tom oficial agora é '+c.tom+'. Gere o portal atualizado para enviar a todos.'); abrirMusica(m.id);
+    return;
+  }
   if(v){
     if(!v.classList.contains('armed')){ v.classList.add('armed','danger'); v.textContent='Confirmar: apagar minha edição'; setTimeout(()=>{ if(v.isConnected){ v.classList.remove('armed','danger'); v.textContent='Voltar à versão oficial'; } },4000); return; }
     st.locais=st.locais.filter(x=>x.id!==m.id); salvarLocais(); st.transp=0;
@@ -929,6 +985,7 @@ function desenharMusica(){
   const c=$('#sCifra'); c.innerHTML = renderCifra(m, st.transp); c.classList.toggle('semcifra', st.semCifra); ajustarLargura(c, st.prefs.fs);
   $('#sObs').textContent = m.obs||'';
   $('#tNome').textContent = tomTransposto(m, st.transp) || (st.transp>0?'+':'')+st.transp;
+  if(desenharMusica.ultimoTransp!==st.transp || desenharMusica.ultimoId!==m.id){ desenharMusica.ultimoTransp=st.transp; desenharMusica.ultimoId=m.id; desenharVersao(m); }
   $('#semCifra').setAttribute('aria-pressed', st.semCifra); $('#semCifra').classList.toggle('pri', st.semCifra);
   const noRep = st.rep.itens.some(i=>i.id===m.id);
   $('#addRep').textContent = noRep ? '✓ No repertório' : '+ Repertório'; $('#addRep').classList.toggle('pri', !noRep);
@@ -1509,7 +1566,7 @@ function renderDados(){
 $('#iGrupo').addEventListener('change', renderDados);
 
 /* ---------- Aprovação pelo site (Firebase) ---------- */
-const VERSAO_APP = 5;
+const VERSAO_APP = 6;
 const NUVEM = {ok:false, db:null, auth:null, user:null, admin:false, semAdmin:false, fila:[]};
 function assinaturaM(m){ const c=JSON.stringify([m.titulo,m.artista,m.tom,m.cifra,m.obs,locs(m)]); let h=0; for(let i=0;i<c.length;i++) h=(Math.imul(h,31)+c.charCodeAt(i))|0; return h; }
 function paraNuvem(m){ const c=JSON.parse(JSON.stringify(limpa(m))); delete c._excluida; delete c.atualizado; delete c.oficializadoEm; return c; }
@@ -1558,6 +1615,7 @@ async function sincronizar(){
     let q=NUVEM.db.collection('musicas'); const desde=st.nuvem.ultimo||0;
     if(desde) q=q.where('atualizadoEm','>',firebase.firestore.Timestamp.fromMillis(desde));
     const snap=await q.get(); let n=0;
+    const tomAntes=new Map(); snap.forEach(d=>tomAntes.set(d.id, raizTom(porId(d.id))));
     snap.forEach(d=>{ const m=d.data(); const t=m.atualizadoEm&&m.atualizadoEm.toMillis?m.atualizadoEm.toMillis():0; delete m.atualizadoEm; m.id=d.id; st.nuvem.musicas[d.id]=m; if(t>st.nuvem.ultimo) st.nuvem.ultimo=t; n++; });
     if(n){
       ls.set('nuvem',st.nuvem);
@@ -1565,6 +1623,7 @@ async function sincronizar(){
       const of=mapaOficial(); const antes=st.locais.length;
       st.locais=st.locais.filter(x=>{ const o=of.get(x.id); return !(o && assinaturaM(o)===assinaturaM(x)); });
       if(st.locais.length!==antes) salvarLocais();
+      for(const [id,a] of tomAntes){ const b=raizTom(porId(id)); if(a>=0 && b>=0 && a!==b) ajustarReps(id, b-a); }
       redesenhar(); if(desde) toast(n+' música(s) atualizada(s) pelo coordenador.');
     }
   }catch(e){}
