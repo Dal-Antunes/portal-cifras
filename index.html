@@ -218,6 +218,9 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
 .hint{font-size:.82rem;color:var(--muted);line-height:1.45}
 .fontes{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px dashed var(--line);border-radius:8px;margin-bottom:14px;background:var(--bg)}
 .fontes .links{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.fontes .links.col{flex-direction:column;align-items:stretch;max-width:420px}
+.fontes .links.col .btn{justify-content:center;white-space:normal;text-align:center}
+.passos{margin:10px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:3px}
 .hint code{font-family:var(--f-mono);background:var(--sunk);padding:0 4px;border-radius:4px}
 
 /* Backup */
@@ -473,7 +476,7 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
         <div class="fontes" id="fFontes">
           <div class="eyebrow">Trazer a cifra</div>
           <div class="row">
-            <button class="btn" type="button" id="srcColar">Colar de um site</button>
+            <button class="btn pri" type="button" id="srcColar">📋 Colar cifra copiada</button>
             <label class="btn" for="srcArquivo">Abrir arquivo (PDF, TXT, ChordPro, OnSong)</label>
             <input type="file" id="srcArquivo" accept=".pdf,.txt,.cho,.chopro,.chordpro,.crd,.pro,.onsong,application/pdf,text/plain" hidden>
           </div>
@@ -1254,6 +1257,34 @@ document.addEventListener('keydown', e=>{
 
 /* ---------- Trazer cifras: colar, arquivo, busca ---------- */
 const LIXO = /^(favoritar( cifra)?|cifra:|exibir|simplificar|cifra simplificada|auto ?rolagem|imprimir|baixar|compartilhar|ver mais|mostrar mais|composição|composicao|compositor|colaboração|colaboracao|enviada por|revisões|revisoes|aprenda a tocar|tocar|vídeo aula|video aula|cifra club|letras\.mus\.br|palco mp3|©|copyright|todos os direitos|esta cifra|acordes|afinação:? *e a d g b e|tabs?|instrumentos?:)/i;
+/* Linhas de site que não são cifra: anúncios, menus, botões, rodapé. Só linhas curtas que começam assim, para não apagar letra. */
+const LIXO_SITE = /^(publicidade|an[uú]ncios?|patrocinad[oa]s?|remover an[uú]ncios|sem an[uú]ncios|assine|seja (pro|premium)|cadastre|fa[çc]a (seu )?login|entrar com|criar conta|cookies|pol[ií]tica|termos( de uso)?|mais (acessadas|tocadas|vistas|populares)|m[uú]sicas relacionadas|outras m[uú]sicas|veja tamb[ée]m|coment[aá]rios?|deixe seu|enviar corre[çc][aã]o|corrigir (a )?cifra|ver (aula|v[ií]deo|letra|cifra)|v[ií]deo ?aula|aprenda a tocar|baixe o|app do|aplicativo|dicion[aá]rio|afinador|metr[oô]nomo|tamanho da (fonte|letra)|rolagem|transpor|meio tom|tom original|compartilh|whatsapp|facebook|instagram|twitter|tiktok|spotify|deezer|playlist|favorit|escrita por|letra e m[uú]sica|composi[çc][aã]o de|interpreta[çc][aã]o|vers[aã]o (original|simplificada)|cifra (completa|simplificada)|instrumentos?:|dificuldade|exibir|ocultar|imprimir|baixar|ver mais|carregar mais)\b.{0,40}$/i;
+const LIXO_FORTE = /^(publicidade|an[uú]ncios?|patrocinad[oa]s?|remover an[uú]ncios|sem an[uú]ncios)\b.{0,40}$/i;
+const URL_RE = /(https?:\/\/|www\.)\S+/i;
+function ehLixoForte(s){ s=s.trim(); if(!s) return false; if(linhaDeAcordes(s)) return false; if(URL_RE.test(s) && s.length<120) return true; if(/^[|·•»›>—–]+$/.test(s)) return true; if(/^\d+([.,]\d+)?\s*(mil|k)?\s*(exibi|visualiza|views|acessos|curtidas)/i.test(s)) return true; return LIXO_FORTE.test(s); }
+const LIXO_PALAVRA = /^(buscar|pesquisar|entrar|sair|menu|in[ií]cio|voltar|salvar|adicionar|seguir|ouvir|mostrar|esconder|anterior|pr[oó]xima|fechar|ok|login|home|mais|cifras|letras|v[ií]deos?|artistas?|g[eê]neros?|estilos?)$/i;
+function ehLixoSite(s){ const t=s.trim(); return ehLixoForte(t) || (!linhaDeAcordes(t) && (LIXO_SITE.test(t) || LIXO_PALAVRA.test(t))); }
+const ehSecao = s => /^\s*\[[^\]]+\]\s*$/.test(s) || /^\s*(intro|introdução|refrão|refrao|estrofe|ponte|pré-refrão|pre-refrao|solo|coro|interlúdio|parte \d)\b[^a-z]{0,6}:?\s*$/i.test(s);
+const temAcorde = s => linhaDeAcordes(s) || /\[[A-G][#b]?[^\]\s]{0,8}\]/.test(s);
+/* Corta o que vem antes da primeira linha de acordes (guarda título e artista) e o rodapé depois da última. */
+function cortarSite(out, r){
+  out = out.filter(l=>!ehLixoForte(l));
+  const iTom = out.indexOf('\u0000TOM');
+  const f = out.findIndex(l=>l!=='\u0000TOM' && (temAcorde(l) || ehSecao(l)));
+  if(f<0) return out.filter(l=>l!=='\u0000TOM');
+  let ini=f; while(ini>0 && out[ini-1].trim() && ehSecao(out[ini-1])) ini--;
+  const limpaCab = a => a.map(l=>l.trim()).filter(Boolean).filter(l=>l!=='\u0000TOM' && l.length<70 && !ehLixoSite(l));
+  // título e artista: no Cifra Club vêm logo antes de "Tom:"; senão, as primeiras linhas
+  let cab = iTom>0 && iTom<ini ? limpaCab(out.slice(0,iTom)).slice(-2) : [];
+  if(!cab.length) cab = limpaCab(out.slice(0,ini));
+  if(!r.titulo && cab.length) r.titulo = cab[0];
+  if(!r.artista && cab.length>1 && cab[1].length<45) r.artista = cab[1];
+  out = out.slice(ini).filter(l=>l!=='\u0000TOM');
+  let u=-1; out.forEach((l,k)=>{ if(temAcorde(l)) u=k; });
+  let fim=u, brancos=0;
+  for(let k=u+1; k<out.length && k<=u+16; k++){ if(!out[k].trim()){ if(++brancos>=2) break; continue; } if(ehLixoSite(out[k])) break; brancos=0; fim=k; }
+  return out.slice(0, fim+1);
+}
 function limparColado(txt){
   let t = String(txt||'').replace(/\u00a0/g,' ').replace(/\r/g,'').replace(/\t/g,'    ').replace(/[\u200b\ufeff]/g,'');
   let linhas = t.split('\n').map(l=>l.replace(/\s+$/,''));
@@ -1275,13 +1306,15 @@ function limparColado(txt){
     // OnSong e cabeçalhos de sites
     if((m=s_.match(/^(title|título|titulo)\s*:\s*(.+)$/i))){ r.titulo=r.titulo||m[2]; continue; }
     if((m=s_.match(/^(artist|artista|intérprete|interprete|by)\s*:\s*(.+)$/i))){ r.artista=r.artista||m[2]; continue; }
-    if((m=s_.match(/^(key|tom)\s*:\s*([A-G][#b]?[^\s(]*)/i))){ r.tom=r.tom||m[2]; continue; }
-    if((m=s_.match(/^(capo|capotraste)\s*:?\s*(.+)$/i))){ r.obs.push('Capotraste: '+m[2]); continue; }
+    if((m=s_.match(/^(key|tom)\s*:\s*([A-G][#b]?[^\s(]*)/i))){ r.tom=r.tom||m[2]; out.push('\u0000TOM'); continue; }
+    if((m=s_.match(/^(capotraste|capo)\b\s*:?\s*(.+)$/i))){ r.obs.push('Capotraste '+m[2].replace(/^:\s*/,'')); continue; }
+    if(/^afina[çc][aã]o\b/i.test(s_)){ if(!/e a d g b e\s*$/i.test(s_)) r.obs.push(s_); continue; }
     if(/^(tempo|time|bpm|duration|ccli|copyright|flow|keywords|book|number)\s*:/i.test(s_)){ continue; }
     if(/^(verse|chorus|bridge|intro|outro|tag|pre-chorus)\s*\d*\s*:\s*$/i.test(s_)){ out.push('['+s_.replace(/:\s*$/,'')+']'); continue; }
     if(s_ && LIXO.test(s_) && !linhaDeAcordes(s_)){ continue; }
     out.push(l);
   }
+  const cortado = cortarSite(out, r); out.length=0; out.push(...cortado);
   // título e artista nas primeiras linhas, antes do primeiro acorde
   while(out.length && !out[0].trim()) out.shift();
   const iAcorde = out.findIndex(l=>linhaDeAcordes(l) || /\[[A-G][^\]]*\]/.test(l));
@@ -1306,7 +1339,11 @@ $('#fCifra').addEventListener('paste', e=>{
   e.preventDefault(); const r=limparColado(txt); aplicarNoForm(r,false);
   toast('Cifra colada e arrumada. Confira o título e a pasta.');
 });
-$('#srcColar').onclick=()=>{ $('#fCifra').focus(); $('#fCifra').select(); toast('Copie a cifra no site e cole aqui no campo Cifra. O portal arruma sozinho.'); };
+$('#srcColar').onclick=async()=>{
+  let txt=''; try{ txt = navigator.clipboard && navigator.clipboard.readText ? await navigator.clipboard.readText() : ''; }catch(e){ txt=''; }
+  if(txt && txt.trim()){ const r=limparColado(txt); if(!r.cifra.trim()){ toast('O que está copiado não parece uma cifra. Copie a cifra no site e tente de novo.'); return; } aplicarNoForm(r,false); toast('Cifra colada e limpa. Confira o título e a pasta.'); $('#fTitulo').scrollIntoView({block:'center'}); return; }
+  $('#fCifra').focus(); $('#fCifra').select(); toast('Toque e segure no campo Cifra e escolha Colar. O portal limpa sozinho.');
+};
 
 /* PDF: pdf.js embutido, carregado só quando precisa */
 let pdfPronto=null;
@@ -1367,6 +1404,21 @@ $('#srcArquivo').addEventListener('change', async e=>{
 });
 
 /* Busca: nome, YouTube ou link de site */
+const slug = s => norm(s).replace(/&/g,' e ').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+function linksCifra(musica, artista){
+  const q=(musica+' '+(artista||'')).trim(), L=[];
+  if(artista){ const base='https://www.cifraclub.com.br/'+slug(artista)+'/'+slug(musica)+'/'; L.push(['Abrir a cifra no Cifra Club', base, true], ['Versão para copiar (sem anúncios)', base+'imprimir.html', true]); }
+  L.push(['Procurar no Cifra Club','https://www.cifraclub.com.br/?q='+encodeURIComponent(q)], ['Procurar no Google','https://www.google.com/search?q='+encodeURIComponent('cifra '+q)], ['Procurar no Cifras.com.br','https://www.google.com/search?q='+encodeURIComponent('site:cifras.com.br '+q)]);
+  return L;
+}
+function mostrarLinks(musica, artista, extra){
+  const box=$('#srcRes'); box.hidden=false;
+  box.innerHTML=(extra?'<div>'+extra+'</div>':'')
+    + '<div class="links col">'+linksCifra(musica,artista).map(([n,u,pri])=>'<a class="btn '+(pri?'pri':'')+'" href="'+esc(u)+'" target="_blank" rel="noopener">'+esc(n)+' ↗</a>').join('')+'</div>'
+    + '<ol class="passos"><li>Abra a cifra num dos botões acima.</li><li>Selecione a cifra e copie (no Cifra Club, a <b>versão para copiar</b> vem sem anúncios).</li><li>Volte aqui e toque em <b>📋 Colar cifra copiada</b>.</li></ol>';
+  if(!$('#fTitulo').value.trim()) $('#fTitulo').value=musica;
+  if(artista && !$('#fArtista').value.trim()) $('#fArtista').value=artista;
+}
 function linkBusca(q){
   const e=encodeURIComponent(q);
   return [['Cifra Club','https://www.cifraclub.com.br/?q='+e],['Google (cifra)','https://www.google.com/search?q='+encodeURIComponent('cifra '+q)],['Cifras.com.br','https://www.google.com/search?q='+encodeURIComponent('site:cifras.com.br '+q)],['Letras.mus.br','https://www.letras.mus.br/?q='+e]];
@@ -1378,8 +1430,23 @@ function mostrarBusca(q, extra){
 }
 async function tituloYoutube(url){
   const tentativas=['https://www.youtube.com/oembed?format=json&url='+encodeURIComponent(url),'https://noembed.com/embed?url='+encodeURIComponent(url)];
-  for(const u of tentativas){ try{ const r=await fetch(u); if(r.ok){ const j=await r.json(); if(j && j.title) return j.title; } }catch(e){} }
+  for(const u of tentativas){ try{ const r=await fetch(u); if(r.ok){ const j=await r.json(); if(j && j.title) return {titulo:j.title, canal:j.author_name||''}; } }catch(e){} }
   return null;
+}
+/* Importar pelo link: usa o Worker do ministério (window.CIFRA_PROXY, em firebase-config.js) quando estiver ligado. */
+async function cifraPeloLink(url){
+  const P=window.CIFRA_PROXY; if(!P || navigator.onLine===false) return null;
+  try{ const r=await fetch(P+'?url='+encodeURIComponent(url)); if(!r.ok) return null; const j=await r.json(); return j && j.cifra && j.cifra.trim() ? j : null; }catch(e){ return null; }
+}
+function aplicarDoLink(j){ const r=limparColado(j.cifra); r.titulo=j.titulo||r.titulo; r.artista=j.artista||r.artista; r.tom=j.tom||r.tom; aplicarNoForm(r, true); }
+/* "Artista - Música (Ao Vivo)" vira música e artista; sem traço, o canal é o artista. */
+function separarVideo(t, canal){
+  const limpo=limparTituloVideo(t); const canalL=String(canal||'').replace(/\s*-\s*topic$/i,'').replace(/\b(oficial|official|vevo|tv|canal)\b/gi,'').replace(/\s{2,}/g,' ').trim();
+  const p=limpo.split(/\s+[-–—]\s+/);
+  if(p.length>=2){ const a=p[0].trim(), b=p.slice(1).join(' - ').trim();
+    if(canalL && norm(b).includes(norm(canalL)) && !norm(a).includes(norm(canalL))) return {musica:a, artista:b};
+    return {musica:b, artista:a}; }
+  return {musica:limpo, artista:canalL};
 }
 function limparTituloVideo(t){ return t.replace(/\[[^\]]*\]|\([^)]*(oficial|official|clipe|ao vivo|live|lyric|letra|vídeo|video)[^)]*\)/gi,'').replace(/\s*[|｜].*$/,'').replace(/\s+(-\s+)?(clipe|vídeo|video) oficial.*$/i,'').replace(/\s{2,}/g,' ').trim(); }
 $('#srcBuscar').onclick=async()=>{
@@ -1388,12 +1455,17 @@ $('#srcBuscar').onclick=async()=>{
   if(/^(https?:\/\/)?(www\.|m\.)?(youtube\.com|youtu\.be)\//i.test(q)){
     box.hidden=false; box.textContent='Buscando o nome da música no YouTube…';
     const t = navigator.onLine===false ? null : await tituloYoutube(/^https?:/i.test(q)?q:'https://'+q);
-    if(t){ const nome=limparTituloVideo(t); $('#srcBusca').value=nome; mostrarBusca(nome, 'Vídeo encontrado: “'+esc(t)+'”.'); }
+    if(t){ const v=separarVideo(t.titulo, t.canal); $('#srcBusca').value=v.musica+(v.artista?' - '+v.artista:''); $('#fTitulo').value=v.musica; if(v.artista) $('#fArtista').value=v.artista;
+      const ach = v.artista ? await cifraPeloLink('https://www.cifraclub.com.br/'+slug(v.artista)+'/'+slug(v.musica)+'/') : null;
+      if(ach){ aplicarDoLink(ach); mostrarLinks(v.musica, v.artista, '✓ Cifra de <b>'+esc(ach.titulo||v.musica)+'</b> trazida do Cifra Club. Confira abaixo. Se não for a versão certa, procure outra:'); return; }
+      mostrarLinks(v.musica, v.artista, 'Vídeo encontrado: <b>'+esc(v.musica)+'</b>'+(v.artista?' · '+esc(v.artista):'')+'. Agora pegue a cifra:'); }
     else { box.innerHTML='Não consegui ler o nome do vídeo (precisa de internet). Digite o nome da música no campo acima e toque em Buscar.'; $('#srcBusca').value=''; $('#srcBusca').focus(); }
     return;
   }
   if(/^https?:\/\//i.test(q)){
     box.hidden=false; box.textContent='Tentando ler a página…';
+    const ach = await cifraPeloLink(q);
+    if(ach){ aplicarDoLink(ach); box.innerHTML='✓ Cifra trazida do link. Confira antes de salvar.'; return; }
     try{
       const r=await fetch(q); const html=await r.text();
       const d=new DOMParser().parseFromString(html,'text/html');
@@ -1401,11 +1473,12 @@ $('#srcBuscar').onclick=async()=>{
       if(pre && pre.textContent.trim()){ const res=limparColado(pre.textContent); if(tit&&!res.titulo) res.titulo=tit.textContent.trim(); aplicarNoForm(res, !$('#fCifra').value.trim()); box.textContent='Cifra trazida do link. Confira antes de salvar.'; return; }
       throw new Error('sem cifra');
     }catch(e){
-      box.innerHTML='O navegador não deixa o portal ler outros sites direto. Abra o link, copie a cifra e cole no campo Cifra.<div class="links"><a class="btn small" href="'+esc(q)+'" target="_blank" rel="noopener">Abrir o link ↗</a></div>';
+      const cc=/cifraclub\.com\.br\/[^/]+\/[^/?#]+/i.test(q) ? q.replace(/[?#].*$/,'').replace(/\/?(imprimir\.html)?$/,'/')+'imprimir.html' : '';
+      box.innerHTML='O navegador não deixa o portal ler outros sites direto. Abra o link, copie a cifra e volte aqui para tocar em <b>📋 Colar cifra copiada</b>.<div class="links col">'+(cc?'<a class="btn pri" href="'+esc(cc)+'" target="_blank" rel="noopener">Versão para copiar (sem anúncios) ↗</a>':'')+'<a class="btn" href="'+esc(q)+'" target="_blank" rel="noopener">Abrir o link ↗</a></div>';
     }
     return;
   }
-  mostrarBusca(q);
+  const partes=q.split(/\s+[-–—]\s+/); mostrarLinks(partes[0].trim(), (partes[1]||$('#fArtista').value||'').trim());
 };
 $('#srcBusca').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); $('#srcBuscar').click(); } });
 
@@ -1588,7 +1661,7 @@ function renderDados(){
 $('#iGrupo').addEventListener('change', renderDados);
 
 /* ---------- Aprovação pelo site (Firebase) ---------- */
-const VERSAO_APP = 7;
+const VERSAO_APP = 8;
 const NUVEM = {ok:false, db:null, auth:null, user:null, admin:false, semAdmin:false, fila:[]};
 function assinaturaM(m){ const c=JSON.stringify([m.titulo,m.artista,m.tom,m.cifra,m.obs,locs(m)]); let h=0; for(let i=0;i<c.length;i++) h=(Math.imul(h,31)+c.charCodeAt(i))|0; return h; }
 function paraNuvem(m){ const c=JSON.parse(JSON.stringify(limpa(m))); delete c._excluida; delete c.atualizado; delete c.oficializadoEm; return c; }
@@ -1745,6 +1818,14 @@ function imprimir(lista, titulo){
 
 atualizarBadge();
 renderAdmin();
+/* Compartilhado de outro app (YouTube, navegador): abre Nova música já buscando o link. */
+(function(){ try{
+  const u=new URLSearchParams(location.search); const txt=[u.get('url'),u.get('text'),u.get('title')].filter(Boolean).join(' ');
+  if(!txt) return;
+  history.replaceState(null,'',location.pathname+'#nova');
+  const link=(txt.match(/https?:\/\/\S+/)||[])[0];
+  setTimeout(()=>{ $('#srcBusca').value = link || txt.trim(); $('#srcBuscar').click(); $('#fFontes').scrollIntoView({block:'start'}); }, 50);
+}catch(e){} })();
 rota();
 // o banco de dados carrega depois que a tela já apareceu, para não travar a abertura
 setTimeout(()=>{ (window.requestIdleCallback || (f=>f()))(()=>iniciarNuvem(), {timeout:2000}); }, 300);
