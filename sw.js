@@ -2,7 +2,7 @@
 // Página: abre na hora com a cópia guardada e, se houver internet, busca a versão nova por trás
 // (antes esperava a internet até 4 segundos, o que parecia travado com sinal fraco).
 // Bibliotecas grandes (fontes, banco de dados, leitor de PDF) ficam num cache que não é apagado a cada versão.
-const VERSAO = 'cifras-2026-11-26-9';
+const VERSAO = 'cifras-2026-11-26-10';
 const LIBS = 'cifras-libs-1';
 const ARQUIVOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './firebase-config.js'];
 const BIBLIOTECAS = ['./vendor/fontes.css', './vendor/firebase-app-compat.js', './vendor/firebase-auth-compat.js',

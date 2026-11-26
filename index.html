@@ -1264,7 +1264,7 @@ document.addEventListener('keydown', e=>{
 /* ---------- Trazer cifras: colar, arquivo, busca ---------- */
 const LIXO = /^(favoritar( cifra)?|cifra:|exibir|simplificar|cifra simplificada|auto ?rolagem|imprimir|baixar|compartilhar|ver mais|mostrar mais|composição|composicao|compositor|colaboração|colaboracao|enviada por|revisões|revisoes|aprenda a tocar|tocar|vídeo aula|video aula|cifra club|letras\.mus\.br|palco mp3|©|copyright|todos os direitos|esta cifra|acordes|afinação:? *e a d g b e|tabs?|instrumentos?:)/i;
 /* Linhas de site que não são cifra: anúncios, menus, botões, rodapé. Só linhas curtas que começam assim, para não apagar letra. */
-const LIXO_SITE = /^(publicidade|an[uú]ncios?|patrocinad[oa]s?|remover an[uú]ncios|sem an[uú]ncios|assine|seja (pro|premium)|cadastre|fa[çc]a (seu )?login|entrar com|criar conta|cookies|pol[ií]tica|termos( de uso)?|mais (acessadas|tocadas|vistas|populares)|m[uú]sicas relacionadas|outras m[uú]sicas|veja tamb[ée]m|coment[aá]rios?|deixe seu|enviar corre[çc][aã]o|corrigir (a )?cifra|ver (aula|v[ií]deo|letra|cifra)|v[ií]deo ?aula|aprenda a tocar|baixe o|app do|aplicativo|dicion[aá]rio|afinador|metr[oô]nomo|tamanho da (fonte|letra)|rolagem|transpor|meio tom|tom original|compartilh|whatsapp|facebook|instagram|twitter|tiktok|spotify|deezer|playlist|favorit|escrita por|letra e m[uú]sica|composi[çc][aã]o de|interpreta[çc][aã]o|vers[aã]o (original|simplificada)|cifra (completa|simplificada)|instrumentos?:|dificuldade|exibir|ocultar|imprimir|baixar|ver mais|carregar mais)\b.{0,40}$/i;
+const LIXO_SITE = /^(publicidade|an[uú]ncios?|patrocinad[oa]s?|remover an[uú]ncios|sem an[uú]ncios|assine|seja (pro|premium)|cadastre|fa[çc]a (seu )?login|entrar com|criar conta|cookies|pol[ií]tica|termos( de uso)?|mais (acessadas|tocadas|vistas|populares)|m[uú]sicas relacionadas|outras m[uú]sicas|veja tamb[ée]m|coment[aá]rios?|deixe seu|enviar corre[çc][aã]o|corrigir (a )?cifra|ver (aula|v[ií]deo|letra|cifra)|v[ií]deo ?aula|aprenda a tocar|baixe o|app do|aplicativo|dicion[aá]rio|afinador|metr[oô]nomo|tamanho da (fonte|letra)|rolagem|transpor|meio tom|tom original|compartilh|whatsapp|facebook|instagram|twitter|tiktok|spotify|deezer|playlist|favorit|escrita por|m[uú]sicas para missa|o site do m[uú]sico|letra e m[uú]sica|composi[çc][aã]o de|interpreta[çc][aã]o|vers[aã]o (original|simplificada)|cifra (completa|simplificada)|instrumentos?:|dificuldade|exibir|ocultar|imprimir|baixar|ver mais|carregar mais)\b.{0,40}$/i;
 const LIXO_FORTE = /^(publicidade|an[uú]ncios?|patrocinad[oa]s?|remover an[uú]ncios|sem an[uú]ncios)\b.{0,40}$/i;
 const URL_RE = /(https?:\/\/|www\.)\S+/i;
 function ehLixoForte(s){ s=s.trim(); if(!s) return false; if(linhaDeAcordes(s)) return false; if(URL_RE.test(s) && s.length<120) return true; if(/^[|·•»›>—–]+$/.test(s)) return true; if(/^\d+([.,]\d+)?\s*(mil|k)?\s*(exibi|visualiza|views|acessos|curtidas)/i.test(s)) return true; return LIXO_FORTE.test(s); }
@@ -1414,7 +1414,7 @@ const slug = s => norm(s).replace(/&/g,' e ').replace(/[^a-z0-9]+/g,'-').replace
 function linksCifra(musica, artista){
   const q=(musica+' '+(artista||'')).trim(), L=[];
   if(artista){ const base='https://www.cifraclub.com.br/'+slug(artista)+'/'+slug(musica)+'/'; L.push(['Abrir a cifra no Cifra Club', base, true], ['Versão para copiar (sem anúncios)', base+'imprimir.html', true]); }
-  L.push(['Procurar no Cifra Club','https://www.cifraclub.com.br/?q='+encodeURIComponent(q)], ['Procurar no Google','https://www.google.com/search?q='+encodeURIComponent('cifra '+q)], ['Procurar no Cifras.com.br','https://www.google.com/search?q='+encodeURIComponent('site:cifras.com.br '+q)]);
+  L.push(['Procurar no Cifra Club','https://www.cifraclub.com.br/?q='+encodeURIComponent(q)], ['Procurar no Google','https://www.google.com/search?q='+encodeURIComponent('cifra '+q)], ['Procurar no Músicas para Missa','https://www.google.com/search?q='+encodeURIComponent('site:musicasparamissa.com.br '+q)], ['Procurar no Cifras.com.br','https://www.google.com/search?q='+encodeURIComponent('site:cifras.com.br '+q)]);
   return L;
 }
 function mostrarLinks(musica, artista, extra){
@@ -1454,6 +1454,7 @@ function separarVideo(t, canal){
     return {musica:b, artista:a}; }
   return {musica:limpo, artista:canalL};
 }
+function separarVideoSite(t, canal){ const v=separarVideo(t, canal); if(/^musicas ?para ?missa/.test(norm(v.artista))) v.artista=''; if(/^musicas ?para ?missa/.test(norm(v.musica)) && v.artista){ v.musica=v.artista; v.artista=''; } return v; }
 function limparTituloVideo(t){ return t.replace(/\[[^\]]*\]|\([^)]*(oficial|official|clipe|ao vivo|live|lyric|letra|vídeo|video)[^)]*\)/gi,'').replace(/\s*[|｜].*$/,'').replace(/\s+(-\s+)?(clipe|vídeo|video) oficial.*$/i,'').replace(/\s{2,}/g,' ').trim(); }
 $('#srcBuscar').onclick=async()=>{
   const q=$('#srcBusca').value.trim(); if(!q){ $('#srcBusca').focus(); return; }
@@ -1461,7 +1462,7 @@ $('#srcBuscar').onclick=async()=>{
   if(/^(https?:\/\/)?(www\.|m\.)?(youtube\.com|youtu\.be)\//i.test(q)){
     box.hidden=false; box.textContent='Buscando o nome da música no YouTube…';
     const t = navigator.onLine===false ? null : await tituloYoutube(/^https?:/i.test(q)?q:'https://'+q);
-    if(t){ const v=separarVideo(t.titulo, t.canal); $('#srcBusca').value=v.musica+(v.artista?' - '+v.artista:''); $('#fTitulo').value=v.musica; if(v.artista) $('#fArtista').value=v.artista;
+    if(t){ const v=separarVideoSite(t.titulo, t.canal); $('#srcBusca').value=v.musica+(v.artista?' - '+v.artista:''); $('#fTitulo').value=v.musica; if(v.artista) $('#fArtista').value=v.artista;
       const ach = v.artista ? await cifraPeloLink('https://www.cifraclub.com.br/'+slug(v.artista)+'/'+slug(v.musica)+'/') : null;
       if(ach){ aplicarDoLink(ach); mostrarLinks(v.musica, v.artista, '✓ Cifra de <b>'+esc(ach.titulo||v.musica)+'</b> trazida do Cifra Club. Confira abaixo. Se não for a versão certa, procure outra:'); return; }
       mostrarLinks(v.musica, v.artista, 'Vídeo encontrado: <b>'+esc(v.musica)+'</b>'+(v.artista?' · '+esc(v.artista):'')+'. Agora pegue a cifra:'); }
@@ -1667,7 +1668,7 @@ function renderDados(){
 $('#iGrupo').addEventListener('change', renderDados);
 
 /* ---------- Aprovação pelo site (Firebase) ---------- */
-const VERSAO_APP = 9;
+const VERSAO_APP = 10;
 const NUVEM = {ok:false, db:null, auth:null, user:null, admin:false, semAdmin:false, fila:[]};
 function assinaturaM(m){ const c=JSON.stringify([m.titulo,m.artista,m.tom,m.cifra,m.obs,locs(m)]); let h=0; for(let i=0;i<c.length;i++) h=(Math.imul(h,31)+c.charCodeAt(i))|0; return h; }
 function paraNuvem(m){ const c=JSON.parse(JSON.stringify(limpa(m))); delete c._excluida; delete c.atualizado; delete c.oficializadoEm; return c; }

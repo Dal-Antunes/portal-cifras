@@ -1,7 +1,7 @@
 // Cloudflare Worker: busca a cifra de um link (Cifra Club, Cifras.com.br, Letras) para o Portal de Cifras.
 // O navegador não deixa o portal ler outros sites direto; este Worker lê e devolve só a cifra.
 // Só aceita pedidos vindos do portal e só abre sites de cifra da lista abaixo.
-const PERMITIDOS = ['cifraclub.com.br', 'www.cifraclub.com.br', 'm.cifraclub.com.br', 'cifras.com.br', 'www.cifras.com.br', 'letras.mus.br', 'www.letras.mus.br'];
+const PERMITIDOS = ['cifraclub.com.br', 'www.cifraclub.com.br', 'm.cifraclub.com.br', 'cifras.com.br', 'www.cifras.com.br', 'letras.mus.br', 'www.letras.mus.br', 'musicasparamissa.com.br', 'www.musicasparamissa.com.br'];
 const ORIGENS = ['https://dal-antunes.github.io'];
 
 function texto(html) {
@@ -24,7 +24,9 @@ export default {
     const r = await fetch(u.toString(), { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Mobile Safari/537.36', 'Accept-Language': 'pt-BR,pt;q=0.9' } });
     if (!r.ok) return json({ erro: 'não encontrei a página', status: r.status }, 404);
     const html = await r.text();
-    const pre = (html.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i) || [])[1];
+    // a cifra costuma vir num <pre>; se não, tenta um bloco com "cifra" na classe (Músicas para Missa e outros)
+    const pre = (html.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i) || [])[1]
+      || (html.match(/<div[^>]*class="[^"]*cifra[^"]*"[^>]*>([\s\S]*?)<\/div>\s*(?:<\/div>|<div[^>]*class="[^"]*(?:compartilh|share|autor|coment)[^"]*")/i) || [])[1];
     if (!pre) return json({ erro: 'não encontrei a cifra nesta página' }, 404);
     const h1 = (html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || [])[1] || '';
     const h2 = (html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i) || [])[1] || '';
