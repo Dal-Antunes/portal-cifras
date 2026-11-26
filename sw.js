@@ -2,9 +2,10 @@
 // Página: abre na hora com a cópia guardada e, se houver internet, busca a versão nova por trás
 // (antes esperava a internet até 4 segundos, o que parecia travado com sinal fraco).
 // Bibliotecas grandes (fontes, banco de dados, leitor de PDF) ficam num cache que não é apagado a cada versão.
-// A base de testes (/portal-cifras-teste/) fica no mesmo endereço do GitHub, então usa caches com outro nome para não apagar os do portal oficial.
-const PREFIXO = self.registration.scope.includes('/portal-cifras-teste/') ? 'teste-' : '';
-const VERSAO = PREFIXO + 'cifras-2026-11-26-16';
+// A homologação (ramo dev, em /homolog/) fica no mesmo endereço do GitHub, então usa caches com outro nome para não apagar os do portal oficial.
+const PREFIXO = self.registration.scope.includes('/homolog/') ? 'teste-' : '';
+const HOMOLOG = new URL('./homolog/', self.registration.scope).pathname;
+const VERSAO = PREFIXO + 'cifras-2026-11-26-17';
 const LIBS = PREFIXO + 'cifras-libs-1';
 const ARQUIVOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './firebase-config.js'];
 const BIBLIOTECAS = ['./vendor/fontes.css', './vendor/firebase-app-compat.js', './vendor/firebase-auth-compat.js',
@@ -34,6 +35,7 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
+  if (!PREFIXO && url.pathname.startsWith(HOMOLOG)) return;   // o portal oficial não mexe na homologação
   if (req.mode === 'navigate') {
     e.respondWith((async () => {
       const cache = await caches.open(VERSAO);

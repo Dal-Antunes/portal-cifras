@@ -1,0 +1,73 @@
+# Publica o site:
+#   ramo main -> https://dal-antunes.github.io/portal-cifras/          (oficial)
+#   ramo dev  -> https://dal-antunes.github.io/portal-cifras/homolog/  (homologação)
+# Na homologação, firebase-config.js é trocado por ambiente-homolog/firebase-config.js
+# e o nome do app instalado vira "Cifras TESTE".
+name: Publicar site
+
+# Roda sempre a partir do main (o GitHub só deixa o main publicar no Pages).
+# Um push no dev dispara "Homologação atualizada", que ao terminar chama este aqui.
+on:
+  push:
+    branches: [main]
+  workflow_run:
+    workflows: ["Homologação atualizada"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Ramo main (oficial)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+
+      - name: Ramo dev (homologação)
+        id: dev
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: dev
+          path: dev
+
+      - name: Montar o site
+        run: |
+          mkdir -p _site
+          tar -C main --exclude=.git --exclude=.github --exclude=ambiente-homolog -cf - . | tar -C _site -xf -
+          if [ -d dev/.git ]; then
+            mkdir -p _site/homolog
+            tar -C dev --exclude=.git --exclude=.github --exclude=ambiente-homolog -cf - . | tar -C _site/homolog -xf -
+            cp dev/ambiente-homolog/firebase-config.js _site/homolog/firebase-config.js
+            python3 - <<'PY'
+          import json
+          p = '_site/homolog/manifest.webmanifest'
+          m = json.load(open(p, encoding='utf-8'))
+          m['name'] = 'TESTE · Portal de Cifras'
+          m['short_name'] = 'Cifras TESTE'
+          m['theme_color'] = '#1f5f7a'
+          json.dump(m, open(p, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
+          PY
+          fi
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4

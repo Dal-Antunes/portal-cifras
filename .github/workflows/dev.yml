@@ -1,0 +1,12 @@
+# Avisa que o ramo dev mudou. Ao terminar, "Publicar site" (no main) remonta o site com a homologação nova.
+name: Homologação atualizada
+
+on:
+  push:
+    branches: [dev]
+
+jobs:
+  aviso:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "dev atualizado em ${{ github.sha }}; a publicação roda em seguida."

@@ -637,8 +637,8 @@ const COR_PASTA = {'Advento':'--lit-roxo','Quaresma':'--lit-roxo','Natal':'--lit
 const corDe = p => COR_PASTA[p] ? 'var('+COR_PASTA[p]+')' : 'var(--muted)';
 
 /* ---------- Armazenamento local (protegido) ---------- */
-/* Base de testes (site em /portal-cifras-teste/): faixa no topo e dados guardados à parte, para não misturar com o portal oficial no mesmo aparelho. */
-const TESTE = /\/portal-cifras-teste\//.test(location.pathname);
+/* Homologação (ramo dev, publicado em /homolog/): faixa no topo e dados guardados à parte, para não misturar com o portal oficial no mesmo aparelho. */
+const TESTE = /\/homolog\//.test(location.pathname);
 const LSP = TESTE ? 'pct.' : 'pc.';
 if(TESTE){ document.title='TESTE · '+document.title; const f=document.createElement('div'); f.className='faixaTeste'; f.textContent='VERSÃO DE TESTE · o que muda aqui não vale para o ministério'; document.body.prepend(f); }
 const ls = {
@@ -1925,7 +1925,7 @@ function renderDados(){
 $('#iGrupo').addEventListener('change', renderDados);
 
 /* ---------- Aprovação pelo site (Firebase) ---------- */
-const VERSAO_APP = 16;
+const VERSAO_APP = 17;
 const NUVEM = {ok:false, db:null, auth:null, user:null, admin:false, semAdmin:false, fila:[]};
 function assinaturaM(m){ const c=JSON.stringify([m.titulo,m.artista,m.tom,m.cifra,m.obs,locs(m)]); let h=0; for(let i=0;i<c.length;i++) h=(Math.imul(h,31)+c.charCodeAt(i))|0; return h; }
 function paraNuvem(m){ const c=JSON.parse(JSON.stringify(limpa(m))); delete c._excluida; delete c.atualizado; delete c.oficializadoEm; return c; }

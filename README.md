@@ -4,6 +4,8 @@ Cifras do Ministério de Música Filhos de Maria e José, Comunidade São José.
 
 Site: https://dal-antunes.github.io/portal-cifras/
 
+Homologação (ramo `dev`): https://dal-antunes.github.io/portal-cifras/homolog/ · Para desenvolver, leia [DESENVOLVIMENTO.md](DESENVOLVIMENTO.md).
+
 - Abra o link no celular e use **Adicionar à tela inicial**. Depois disso o portal funciona sem internet.
 - Quando houver internet, o portal baixa sozinho a versão nova.
 - As músicas oficiais mudam pela aprovação no próprio portal (veja abaixo), sem mexer nos arquivos.
