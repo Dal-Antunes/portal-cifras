@@ -251,6 +251,22 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
 .tela .cifra{height:100%;line-height:1.22;column-gap:28px;column-fill:auto;column-rule:1px solid var(--line)}
 .tela .cifra .l{min-height:1.22em}
 .tela .cifra .par{display:block;break-inside:avoid}
+/* Modo Ao Vivo */
+.vivobar{display:flex;align-items:center;gap:8px;padding:5px max(10px,env(safe-area-inset-right,0px)) 5px max(10px,env(safe-area-inset-left,0px));background:var(--sunk);border-bottom:1px solid var(--line);font-size:.86rem}
+.vivobar .tx{margin-right:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vivobar .btn{padding:3px 10px;min-height:32px}
+#vbBtns{display:flex;gap:6px;flex-shrink:0}
+.tela .vivobar .btn{min-height:32px}
+.pt{display:inline-block;width:9px;height:9px;border-radius:50%;background:#d23b2a;margin-right:6px;vertical-align:middle;animation:pisca 1.6s ease-in-out infinite}
+.pausa .pt,.pt.off{background:var(--muted);animation:none}
+@keyframes pisca{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){ .pt{animation:none} }
+.vivomsg{font-family:inherit;font-size:1.05rem;color:var(--muted);text-align:center;padding:24vh 16px 0;white-space:normal;line-height:1.5}
+.vivoflut{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 20px);z-index:74;display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1.5px solid #d23b2a;border-radius:14px;padding:8px 10px 8px 14px;box-shadow:0 8px 28px rgba(0,0,0,.18);max-width:calc(100% - 24px);font-size:.9rem}
+.vivoflut.pausa{border-color:var(--line)}
+.vivoflut .tx{margin-right:auto}
+@media (max-width:760px){ .vivoflut{bottom:calc(env(safe-area-inset-bottom,0px) + 72px);width:calc(100% - 24px)} }
+.vivolink{word-break:break-all;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.9rem;margin:8px 0 12px}
 /* Modal e aviso */
 .modal{position:fixed;inset:0;z-index:60;background:rgba(10,10,20,.5);display:flex;align-items:center;justify-content:center;padding:16px}
 .modal .box{background:var(--surface);border-radius:var(--r);padding:18px;max-width:620px;width:100%;display:flex;flex-direction:column;gap:10px;max-height:90vh}
@@ -468,6 +484,10 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
           <button class="btn" id="novoRep">Começar outro</button>
         </div>
       </div>
+      <div class="card" id="vivoCard">
+        <h3>📡 Modo Ao Vivo</h3>
+        <div id="vivoCorpo"></div>
+      </div>
       <div class="card">
         <h3>Repertórios salvos</h3>
         <p class="hint" style="margin:4px 0 10px">Toque em Abrir para carregar um repertório, mudar e salvar por cima.</p>
@@ -569,12 +589,15 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
     <span class="tom"><button class="btn icon" id="tlMenos" aria-label="Baixar meio tom">−</button><output id="tlTom"></output><button class="btn icon" id="tlMais" aria-label="Subir meio tom">+</button></span>
     <span class="tom"><button class="btn icon" id="tlFm" aria-label="Diminuir letra">A−</button><button class="btn icon" id="tlFp" aria-label="Aumentar letra">A+</button></span>
     <button class="btn" id="tlAnt" aria-label="Música anterior">←</button><button class="btn pri" id="tlProx" aria-label="Próxima música">→</button>
+    <button class="btn" id="tlVivo" hidden aria-label="Transmitir ao vivo">📡 Ao vivo</button>
     <button class="btn" id="tlSair">Sair</button>
   </div>
+  <div class="vivobar" id="vivoBar" hidden><span class="tx" id="vbTxt"></span><span id="vbBtns"></span></div>
   <div class="tbody" id="tlBody"><div class="cifra" id="tlCifra"></div></div>
 </div>
 <div class="modal" id="modal" hidden></div>
 <div class="toast" id="toast" role="status" hidden></div>
+<div class="vivoflut" id="vivoFlut" role="status" hidden></div>
 <div class="faixa" id="faixaNova" role="status" hidden><span>Nova versão do portal disponível.</span><button class="btn pri" id="faixaBtn">Atualizar agora</button></div>
 
 <!-- pdf.js 3.11.174 (Mozilla, Apache-2.0): no site fica em vendor/; no arquivo offline vai embutido aqui -->
@@ -1171,14 +1194,17 @@ function fecharTela(peloVoltar){
   try{ tela.wake&&tela.wake.release(); }catch(e){} tela.wake=null;
   if(tela.origem==='musica'){ st.transp=tela.lista[0].s; desenharMusica(); }
   if(tela.origem==='rep'){ salvarRep(); if(!$('#v-repertorio').hidden) renderRep(); }
+  if(tela.origem==='vivo' && VIVO.papel==='musico') VIVO.pausado=true;   // saiu da tela: continua na sala, mas solto
+  atualizarVivoUI();
 }
 function desenharTela(){
-  const it=tela.lista[tela.k]; const m=it&&porId(it.id); if(!m){ fecharTela(); return; }
-  const n=tela.lista.length;
-  $('#tlPos').textContent = n>1 ? (tela.k+1)+' de '+n+(m.momento&&m.grupo==='missa'?' · '+m.momento:'') : (m.momento&&m.grupo==='missa'?m.momento:'');
+  const it=tela.lista[tela.k]; const m=it&&(it.m||porId(it.id));
+  if(!m){ if(tela.origem==='vivo'){ telaVivoVazia(); return; } fecharTela(); return; }
+  const n=tela.lista.length; const vivoM = tela.origem==='vivo';
+  $('#tlPos').textContent = vivoM ? (VIVO.ultimo&&VIVO.ultimo.pos||'') : n>1 ? (tela.k+1)+' de '+n+(m.momento&&m.grupo==='missa'?' · '+m.momento:'') : (m.momento&&m.grupo==='missa'?m.momento:'');
   $('#tlTit').textContent = m.titulo;
   $('#tlTom').textContent = tomTransposto(m,it.s)||'';
-  $('#tlAnt').hidden = $('#tlProx').hidden = n<2;
+  $('#tlAnt').hidden = $('#tlProx').hidden = n<2 || vivoM; $('#tlMenos').disabled=$('#tlMais').disabled=false;
   $('#tlAnt').disabled = tela.k===0; $('#tlProx').disabled = tela.k>=n-1;
   const c=$('#tlCifra'); c.innerHTML=renderCifra(m,it.s); c.classList.toggle('semcifra', st.semCifra);
   // tira linhas vazias do começo/fim e junta acorde + letra para não separar na coluna
@@ -1187,7 +1213,10 @@ function desenharTela(){
   while(ls_.length && !ls_[ls_.length-1].textContent.trim()){ ls_.pop().remove(); }
   for(let i=0;i<ls_.length-1;i++){ const a=ls_[i], b=ls_[i+1];
     if(a.classList.contains('cl') && !b.classList.contains('cl') && !b.classList.contains('sec') && b.textContent.trim()){ const par=document.createElement('span'); par.className='par'; a.before(par); par.append(a,b); i++; } }
+  if(vivoM && VIVO.ultimo && VIVO.ultimo.prox){ const nx=document.createElement('span'); nx.className='l sec'; nx.textContent='A seguir: '+VIVO.ultimo.prox; c.append(nx); }
   encaixar();
+  if(VIVO.papel==='coord' && !vivoM) enviarVivo();
+  atualizarVivoUI();
 }
 function encaixar(){
   if($('#tela').hidden) return;
@@ -1225,8 +1254,9 @@ document.addEventListener('fullscreenchange', ()=>setTimeout(encaixar,80));
 $('#telaCheia').onclick=()=>abrirTela([{id:st.atual, s:st.transp}],0,'musica');
 $('#tocarTela').onclick=()=>{ if(st.rep.itens.length) abrirTela(st.rep.itens,0,'rep'); };
 $('#tlSair').onclick=()=>fecharTela();
-$('#tlMais').onclick=()=>{ tela.lista[tela.k].s++; if(tela.origem==='rep') salvarRep(); desenharTela(); };
-$('#tlMenos').onclick=()=>{ tela.lista[tela.k].s--; if(tela.origem==='rep') salvarRep(); desenharTela(); };
+function mudarTomTela(d){ const it=tela.lista[tela.k]; if(!it) return; it.s+=d; if(tela.origem==='rep') salvarRep(); if(tela.origem==='vivo') VIVO.delta[it.id]=it.s-it.base; desenharTela(); }
+$('#tlMais').onclick=()=>mudarTomTela(1);
+$('#tlMenos').onclick=()=>mudarTomTela(-1);
 function zoomTela(f){ let z=(st.prefs.zoomTela||1)*f; if(Math.abs(z-1)<0.05) z=1; st.prefs.zoomTela=Math.min(2.5,Math.max(0.6,z)); ls.set('prefs',st.prefs); encaixar(); }
 $('#tlFp').onclick=()=>zoomTela(1.15);
 $('#tlFm').onclick=()=>zoomTela(1/1.15);
@@ -1245,6 +1275,189 @@ document.addEventListener('keydown', e=>{
     if(b.scrollWidth>b.clientWidth+2) return;   // letra maior que a tela: deslizar rola para o lado, não troca de música
     if(Math.abs(dx)>60 && Math.abs(dx)>Math.abs(dy)*1.5){ (dx<0?$('#tlProx'):$('#tlAnt')).click(); } },{passive:true});
 })();
+
+/* ---------- Modo Ao Vivo ----------
+   O coordenador abre uma sala e mostra as músicas na Tela cheia; quem abre o link (?sala=nome) vê a mesma música na hora.
+   Usa o banco de dados que o app já tem (Firestore): aovivo/<sala> guarda a música do momento e
+   aovivo/<sala>/pessoas/<aparelho> marca quem está conectado (só um horário, nada pessoal).
+   Só o coordenador (conta Google) escreve na sala; os músicos entram sem login e podem mudar o tom só no próprio aparelho. */
+const VIVO={sala:null, papel:null, pausado:false, ultimo:null, delta:{}, desligar:[], timers:[], pessoas:null, conect:false, erro:'', wake:null, enviado:''};
+const slugSala = s => norm(s).replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30).replace(/-+$/,'');
+const linkSala = s => location.origin + location.pathname + '?sala=' + encodeURIComponent(s);
+const docSala = () => NUVEM.db.collection('aovivo').doc(VIVO.sala);
+const agoraSrv = () => firebase.firestore.FieldValue.serverTimestamp();
+function manterTelaAcesa(){ try{ if(navigator.wakeLock && !VIVO.wake && document.visibilityState==='visible') navigator.wakeLock.request('screen').then(w=>{ VIVO.wake=w; w.addEventListener && w.addEventListener('release',()=>{ VIVO.wake=null; }); }).catch(()=>{}); }catch(e){} }
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState!=='visible' || !VIVO.sala) return; manterTelaAcesa(); if(VIVO.papel==='musico') marcarPresenca(); else contarPessoas(); });
+function limparVivo(){ VIVO.desligar.forEach(f=>{ try{ f(); }catch(e){} }); VIVO.desligar=[]; VIVO.timers.forEach(clearInterval); VIVO.timers=[]; try{ VIVO.wake&&VIVO.wake.release(); }catch(e){} VIVO.wake=null; }
+function regrasFaltando(e){ return e && String(e.code||'').includes('permission'); }
+const MSG_REGRAS='A sala ao vivo ainda não foi liberada no banco de dados. O coordenador precisa atualizar as regras do Firebase (veja o manual).';
+
+/* --- coordenador --- */
+function iniciarVivoModal(depois){
+  if(EMBUTIDO || !NUVEM.ok){ toast('O Modo Ao Vivo funciona no site, com internet.'); return; }
+  if(!st.admin){ toast('Só o coordenador abre uma sala. Entre com a conta Google em Compartilhar.'); return; }
+  const hoje=new Date(); const sug = slugSala(st.rep.nome) || ('missa-'+String(hoje.getDate()).padStart(2,'0')+'-'+String(hoje.getMonth()+1).padStart(2,'0'));
+  const md=$('#modal');
+  md.innerHTML='<div class="box" role="dialog" aria-modal="true" aria-label="Modo Ao Vivo"><h3>📡 Iniciar ao vivo</h3>'
+    +'<p class="hint">Quem abrir o link vai ver no próprio celular a mesma música que você mostrar na Tela cheia. Cada um pode mudar o tom só para si.</p>'
+    +'<div class="field"><label for="vvNome">Nome da sala</label><input id="vvNome" type="text" maxlength="30" autocomplete="off" value="'+esc(sug)+'"></div>'
+    +'<div class="row"><button class="btn pri" id="vvIr">Iniciar ao vivo</button><button class="btn" id="vvCancel">Cancelar</button></div></div>';
+  mostrarModal();
+  $('#vvCancel').onclick=()=>fecharModal();
+  $('#vvIr').onclick=async()=>{ const s=slugSala($('#vvNome').value); if(!s){ toast('Escreva um nome para a sala.'); return; }
+    $('#vvIr').disabled=true; const ok=await iniciarVivo(s); fecharModal(); if(!ok) return; if(depois) depois(); mostrarLinkSala(); };
+}
+async function iniciarVivo(sala){
+  limparVivo(); VIVO.sala=sala; VIVO.papel='coord'; VIVO.pessoas=null; VIVO.enviado=''; VIVO.erro='';
+  try{ await docSala().set({ativo:true, sala, musica:null, s:0, pos:'', prox:'', inicio:agoraSrv(), atualizado:agoraSrv()}); }
+  catch(e){ VIVO.sala=null; VIVO.papel=null; toast(regrasFaltando(e)?MSG_REGRAS:erroNuvem(e)); atualizarVivoUI(); return false; }
+  VIVO.desligar.push(docSala().collection('pessoas').onSnapshot(snap=>{ VIVO.snapP=snap; contarPessoas(); }, ()=>{ VIVO.pessoas=null; atualizarVivoUI(); }));
+  VIVO.timers.push(setInterval(()=>{ contarPessoas(); enviarVivo(true); }, 60000));
+  manterTelaAcesa(); atualizarVivoUI(); if(!$('#tela').hidden) enviarVivo();
+  return true;
+}
+function contarPessoas(){ const s=VIVO.snapP; if(!s) return; const agora=Date.now(); let n=0;
+  s.forEach(d=>{ const v=(d.data()||{}).visto; const t=v&&v.toMillis?v.toMillis():0; if(agora-t<150000) n++; });
+  VIVO.pessoas=n; atualizarVivoUI(); }
+function estadoVivo(){
+  const it=!$('#tela').hidden && tela.origem!=='vivo' && tela.lista[tela.k]; const m=it&&(it.m||porId(it.id));
+  if(!m) return VIVO.estado||{musica:null, s:0, pos:'', prox:''};
+  const n=tela.lista.length, px=n>1 && tela.lista[tela.k+1] && porId(tela.lista[tela.k+1].id);
+  return {musica:{id:m.id, titulo:m.titulo||'', artista:m.artista||'', tom:m.tom||'', grupo:m.grupo||'', momento:m.momento||'', cifra:m.cifra||''},
+    s:it.s||0, pos:(n>1?(tela.k+1)+' de '+n:'')+(m.momento&&m.grupo==='missa'?(n>1?' · ':'')+m.momento:''), prox:px?px.titulo:''};
+}
+function enviarVivo(forcar){
+  if(VIVO.papel!=='coord' || !NUVEM.ok) return;
+  const e=estadoVivo(); VIVO.estado=e; const chave=JSON.stringify(e);
+  if(!forcar && chave===VIVO.enviado) return;
+  clearTimeout(VIVO.tEnv);
+  VIVO.tEnv=setTimeout(()=>{ VIVO.enviado=chave; docSala().set({...e, ativo:true, sala:VIVO.sala, atualizado:agoraSrv()}).then(()=>{ VIVO.erro=''; atualizarVivoUI(); }).catch(err=>{ VIVO.enviado=''; VIVO.erro=regrasFaltando(err)?MSG_REGRAS:'Sem internet: a música vai para todos quando a conexão voltar.'; atualizarVivoUI(); }); }, forcar?0:120);
+}
+function encerrarVivo(){
+  if(VIVO.papel==='coord' && NUVEM.ok){ const d=docSala(); d.set({ativo:false, sala:VIVO.sala, musica:null, s:0, pos:'', prox:'', atualizado:agoraSrv()}).catch(()=>{}); toast('Apresentação ao vivo encerrada.'); }
+  if(VIVO.papel==='musico'){ try{ history.replaceState(history.state,'',location.pathname+location.hash); }catch(e){} if(!$('#tela').hidden && tela.origem==='vivo') fecharTela(); }
+  limparVivo(); VIVO.sala=null; VIVO.papel=null; VIVO.ultimo=null; VIVO.estado=null; VIVO.pausado=false;
+  atualizarVivoUI();
+}
+function mostrarLinkSala(){
+  if(!VIVO.sala) return; const url=linkSala(VIVO.sala); const txt='Acompanhe as cifras ao vivo no Portal de Cifras: '+url;
+  const md=$('#modal');
+  md.innerHTML='<div class="box" role="dialog" aria-modal="true" aria-label="Link da sala"><h3><span class="pt"></span>Sala “'+esc(VIVO.sala)+'” ao vivo</h3>'
+    +'<p class="hint">Mande este link para os músicos. Quem abrir entra direto, sem login.</p><div class="vivolink">'+esc(url)+'</div>'
+    +'<div class="row"><button class="btn pri" id="vlCopiar">Copiar link</button>'+(navigator.share?'<button class="btn" id="vlShare">Compartilhar…</button>':'')
+    +'<a class="btn" id="vlZap" href="https://wa.me/?text='+encodeURIComponent(txt)+'" target="_blank" rel="noopener">WhatsApp</a><button class="btn" id="vlOk">Fechar</button></div></div>';
+  mostrarModal();
+  $('#vlCopiar').onclick=()=>copiar(url,'Link da sala copiado.');
+  if($('#vlShare')) $('#vlShare').onclick=()=>navigator.share({title:'Portal de Cifras ao vivo', text:'Acompanhe as cifras ao vivo:', url}).catch(()=>{});
+  $('#vlOk').onclick=()=>fecharModal();
+}
+
+/* --- músico --- */
+function entrarSala(sala){
+  sala=slugSala(sala); if(!sala) return;
+  if(VIVO.papel==='coord'){ toast('Você já está transmitindo a sala “'+VIVO.sala+'”.'); return; }
+  limparVivo(); VIVO.sala=sala; VIVO.papel='musico'; VIVO.pausado=false; VIVO.ultimo=null; VIVO.conect=false; VIVO.erro=''; VIVO.delta={};
+  VIVO.dev = ls.get('aparelho','') || ('a'+Date.now().toString(36)+Math.random().toString(36).slice(2,8)); ls.set('aparelho',VIVO.dev);
+  try{ if(new URLSearchParams(location.search).get('sala')!==sala) history.replaceState(history.state,'',location.pathname+'?sala='+encodeURIComponent(sala)+location.hash); }catch(e){}
+  abrirVivo(); manterTelaAcesa();
+  if(EMBUTIDO || !/^https?:$/.test(location.protocol)){ VIVO.erro='O Modo Ao Vivo funciona no site, com internet.'; atualizarVivoUI(); telaVivoVazia(); return; }
+  conectarSala();
+  VIVO.timers.push(setInterval(marcarPresenca, 45000));
+}
+async function conectarSala(){
+  if(VIVO.papel!=='musico') return;
+  if(!NUVEM.ok){ try{ await (NUVEM.inicio || Promise.resolve()); }catch(e){} }
+  if(VIVO.papel!=='musico') return;
+  if(!NUVEM.ok){ VIVO.erro = navigator.onLine===false ? 'Sem internet. Tentando de novo…' : 'Não foi possível abrir o banco de dados. Tentando de novo…'; atualizarVivoUI(); telaVivoVazia();
+    clearTimeout(VIVO.tRe); VIVO.tRe=setTimeout(()=>{ NUVEM.inicio=iniciarNuvem(); conectarSala(); }, 5000); return; }
+  const parar=docSala().onSnapshot({includeMetadataChanges:true}, doc=>{
+    VIVO.conect=!(doc.metadata&&doc.metadata.fromCache); VIVO.erro='';
+    if(!doc.exists){ VIVO.ultimo=null; VIVO.estadoSala='nao'; }
+    else { const d=doc.data()||{}; VIVO.estadoSala = d.ativo ? 'ok' : 'fim'; VIVO.ultimo = d.ativo ? d : null; }
+    if(!VIVO.pausado) mostrarVivo(); atualizarVivoUI();
+  }, err=>{
+    VIVO.conect=false; VIVO.erro = regrasFaltando(err) ? MSG_REGRAS : 'Conexão perdida. Tentando de novo…'; atualizarVivoUI(); if(!VIVO.pausado) telaVivoVazia();
+    clearTimeout(VIVO.tRe); VIVO.tRe=setTimeout(conectarSala, 5000);   // tenta reconectar a cada 5 segundos
+  });
+  VIVO.desligar.push(parar); marcarPresenca();
+}
+function marcarPresenca(){ if(VIVO.papel!=='musico' || !NUVEM.ok || !VIVO.dev) return; try{ docSala().collection('pessoas').doc(VIVO.dev).set({visto:agoraSrv()}).catch(()=>{}); }catch(e){} }
+function abrirVivo(){
+  VIVO.pausado=false;
+  if(!$('#tela').hidden && tela.origem!=='vivo'){ fecharTela(); }
+  if($('#tela').hidden){ tela.lista=[]; tela.k=0; abrirTela([],0,'vivo'); } else mostrarVivo();
+  mostrarVivo();
+}
+function mostrarVivo(){
+  if(VIVO.papel!=='musico' || $('#tela').hidden || tela.origem!=='vivo') return;
+  const d=VIVO.ultimo;
+  if(!d || !d.musica){ tela.lista=[]; telaVivoVazia(); return; }
+  const id=d.musica.id||'?', antes=tela.lista[0]&&tela.lista[0].id;
+  const base=+d.s||0; tela.lista=[{id, base, s:base+(VIVO.delta[id]||0), m:{...d.musica, id}}]; tela.k=0;
+  desenharTela();
+  if(antes!==id){ $('#tlBody').scrollTop=0; $('#tlBody').scrollLeft=0; }
+}
+function telaVivoVazia(){
+  if($('#tela').hidden || tela.origem!=='vivo') return;
+  const msg = VIVO.erro || (VIVO.estadoSala==='fim' ? 'O coordenador encerrou a apresentação.' : VIVO.estadoSala==='nao' ? 'A sala “'+VIVO.sala+'” ainda não começou. Assim que o coordenador iniciar, a música aparece aqui.' : VIVO.ultimo ? 'Aguardando o coordenador escolher a música…' : 'Conectando à sala “'+VIVO.sala+'”…');
+  $('#tlPos').textContent=''; $('#tlTit').textContent='Ao vivo'; $('#tlTom').textContent='';
+  $('#tlAnt').hidden=$('#tlProx').hidden=true; $('#tlMenos').disabled=$('#tlMais').disabled=true;
+  const c=$('#tlCifra'); c.style.columnCount=''; c.style.fontSize=''; c.innerHTML='<p class="vivomsg">'+esc(msg)+'</p>';
+  atualizarVivoUI();
+}
+
+/* --- barras e botões --- */
+function atualizarVivoUI(){
+  const bar=$('#vivoBar'), fl=$('#vivoFlut'), telaAberta=!$('#tela').hidden;
+  $('#tlVivo').hidden = !(st.admin && NUVEM.ok && !VIVO.sala && telaAberta && tela.origem!=='vivo');
+  if(!VIVO.sala){ bar.hidden=true; fl.hidden=true; renderVivoCard(); return; }
+  const n=VIVO.pessoas, qt = n==null ? '' : ' · '+(n===1?'1 conectado':n+' conectados');
+  if(VIVO.papel==='coord'){
+    const txt='<span class="pt"></span><b>Ao vivo</b> · sala '+esc(VIVO.sala)+qt+(VIVO.erro?' · <span class="muted">'+esc(VIVO.erro)+'</span>':'');
+    bar.hidden=!telaAberta; bar.classList.remove('pausa');
+    $('#vbTxt').innerHTML=txt; $('#vbBtns').innerHTML='<button class="btn" data-v="link">Link</button> <button class="btn danger" data-v="fim">Encerrar</button>';
+    fl.hidden=telaAberta; fl.classList.remove('pausa');
+    fl.innerHTML='<span class="tx">'+txt+'</span><button class="btn pri" data-v="voltar">Voltar à tela</button><button class="btn" data-v="link">Link</button><button class="btn danger" data-v="fim">Encerrar</button>';
+  } else {
+    const off=!VIVO.conect || VIVO.erro;
+    const st_ = VIVO.pausado ? 'Pausado: você está navegando sozinho' : off ? (VIVO.erro||'Reconectando…') : VIVO.estadoSala==='ok' ? 'Ao vivo com o coordenador' : VIVO.estadoSala==='fim' ? 'Apresentação encerrada' : 'Aguardando o coordenador';
+    const ponto='<span class="pt'+(off||VIVO.pausado||VIVO.estadoSala!=='ok'?' off':'')+'"></span>';
+    bar.hidden=!(telaAberta && tela.origem==='vivo'); bar.classList.toggle('pausa', VIVO.pausado);
+    $('#vbTxt').innerHTML=ponto+esc(st_);
+    $('#vbBtns').innerHTML = VIVO.pausado ? '<button class="btn pri" data-v="sync">Sincronizar agora</button>' : '<button class="btn" data-v="pausar">Pausar</button>';
+    fl.hidden = telaAberta && tela.origem==='vivo'; fl.classList.toggle('pausa', true);
+    fl.innerHTML='<span class="tx">'+ponto+'Sala ao vivo “'+esc(VIVO.sala)+'”</span><button class="btn pri" data-v="sync">Sincronizar agora</button><button class="btn" data-v="sair">Sair da sala</button>';
+  }
+  renderVivoCard();
+}
+function acaoVivo(e){
+  const b=e.target.closest('[data-v]'); if(!b) return; const v=b.dataset.v;
+  if(v==='link') mostrarLinkSala();
+  if(v==='fim'){ if(!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent='Encerrar?'; setTimeout(()=>{ b.classList.remove('armed'); b.textContent='Encerrar'; },3500); return; } encerrarVivo(); }
+  if(v==='voltar'){ if(tela.lista.length && tela.origem!=='vivo') abrirTela(tela.lista, tela.k, tela.origem); else if(st.rep.itens.length) abrirTela(st.rep.itens,0,'rep'); else toast('Abra uma música ou o repertório na Tela cheia para mostrar a todos.'); }
+  if(v==='pausar'){ VIVO.pausado=true; atualizarVivoUI(); toast('Pausado. A tela não muda mais sozinha até você tocar em Sincronizar agora.'); }
+  if(v==='sync'){ if($('#tela').hidden || tela.origem!=='vivo') abrirVivo(); else { VIVO.pausado=false; mostrarVivo(); } atualizarVivoUI(); }
+  if(v==='sair'){ encerrarVivo(); toast('Você saiu da sala ao vivo.'); }
+  if(v==='iniciar'){ iniciarVivoModal(()=>{ if(st.rep.itens.length) abrirTela(st.rep.itens,0,'rep'); }); }
+  if(v==='entrar'){ const s=slugSala(($('#vcSala')||{}).value); if(!s){ toast('Digite o nome da sala que o coordenador passou.'); return; } entrarSala(s); }
+}
+$('#vivoBar').addEventListener('click', acaoVivo);
+$('#vivoFlut').addEventListener('click', acaoVivo);
+$('#vivoCard').addEventListener('click', acaoVivo);
+$('#vivoCard').addEventListener('keydown', e=>{ if(e.key==='Enter' && e.target.id==='vcSala'){ e.preventDefault(); acaoVivo({target:{closest:()=>({dataset:{v:'entrar'}})}}); } });
+$('#tlVivo').onclick=()=>iniciarVivoModal(()=>enviarVivo());
+function renderVivoCard(){
+  const el=$('#vivoCorpo'); if(!el) return;
+  if(EMBUTIDO || !/^https?:$/.test(location.protocol)){ el.innerHTML='<p class="hint">Funciona no site do portal, com internet: o coordenador troca a música e ela aparece na hora no celular de todos.</p>'; return; }
+  let h='';
+  if(VIVO.papel==='coord') h='<p class="hint"><span class="pt"></span>Você está ao vivo na sala <b>'+esc(VIVO.sala)+'</b>'+(VIVO.pessoas!=null?' · '+VIVO.pessoas+' conectado'+(VIVO.pessoas===1?'':'s'):'')+'. O que você mostrar na Tela cheia aparece para todos.</p><div class="row"><button class="btn pri" data-v="voltar">Mostrar na Tela cheia</button><button class="btn" data-v="link">Link da sala</button><button class="btn danger" data-v="fim">Encerrar</button></div>';
+  else if(VIVO.papel==='musico') h='<p class="hint">Você está na sala <b>'+esc(VIVO.sala)+'</b>.</p><div class="row"><button class="btn pri" data-v="sync">Voltar ao vivo</button><button class="btn" data-v="sair">Sair da sala</button></div>';
+  else {
+    if(st.admin && NUVEM.ok) h+='<p class="hint">Mostre este repertório ao vivo: você troca a música na Tela cheia e ela aparece na hora no celular de todos que abrirem o link.</p><div class="row" style="margin-bottom:12px"><button class="btn pri" data-v="iniciar">📡 Iniciar ao vivo</button></div>';
+    h+='<p class="hint">Recebeu o link do coordenador? É só abrir. Ou digite o nome da sala:</p><div class="row"><input type="text" id="vcSala" placeholder="Ex.: missa-domingo" maxlength="30" autocomplete="off" style="flex:1;min-width:0"><button class="btn" data-v="entrar">Entrar</button></div>';
+  }
+  if(el.innerHTML!==h) el.innerHTML=h;
+}
 
 /* ---------- Modo tocar ---------- */
 let playK=0, wake=null;
@@ -1687,7 +1900,7 @@ function renderDados(){
 $('#iGrupo').addEventListener('change', renderDados);
 
 /* ---------- Aprovação pelo site (Firebase) ---------- */
-const VERSAO_APP = 12;
+const VERSAO_APP = 13;
 const NUVEM = {ok:false, db:null, auth:null, user:null, admin:false, semAdmin:false, fila:[]};
 function assinaturaM(m){ const c=JSON.stringify([m.titulo,m.artista,m.tom,m.cifra,m.obs,locs(m)]); let h=0; for(let i=0;i<c.length;i++) h=(Math.imul(h,31)+c.charCodeAt(i))|0; return h; }
 function paraNuvem(m){ const c=JSON.parse(JSON.stringify(limpa(m))); delete c._excluida; delete c.atualizado; delete c.oficializadoEm; return c; }
@@ -1698,7 +1911,7 @@ function redesenhar(){
   if(!$('#v-repertorio').hidden) renderRep();
   if(!$('#v-musica').hidden && st.atual && porId(st.atual)){ abrirMusica(st.atual); }
   if(!$('#v-dados').hidden) renderDados();
-  renderAdmin();
+  renderAdmin(); atualizarVivoUI();
 }
 async function iniciarNuvem(){
   if(!/^https?:$/.test(location.protocol) || EMBUTIDO) return;
@@ -1893,7 +2106,10 @@ renderAdmin();
 }catch(e){} })();
 rota();
 // o banco de dados carrega depois que a tela já apareceu, para não travar a abertura
-setTimeout(()=>{ (window.requestIdleCallback || (f=>f()))(()=>iniciarNuvem(), {timeout:2000}); }, 300);
+const SALA_LINK = (()=>{ try{ return new URLSearchParams(location.search).get('sala')||''; }catch(e){ return ''; } })();
+if(SALA_LINK){ NUVEM.inicio=iniciarNuvem(); entrarSala(SALA_LINK); }   // entrou pelo link da sala ao vivo: conecta já
+else setTimeout(()=>{ (window.requestIdleCallback || (f=>f()))(()=>{ NUVEM.inicio=iniciarNuvem(); }, {timeout:2000}); }, 300);
+renderVivoCard();
 
 /* App instalável: funciona offline e se atualiza sozinho quando há internet (só no site, não no arquivo). */
 if('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !EMBUTIDO){

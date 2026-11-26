@@ -5,6 +5,7 @@ rules_version = '2';
 // - Todos leem os repertórios publicados; só o coordenador publica ou apaga.
 // - Só o coordenador (a conta Google gravada em config/admin) aprova, recusa, edita ou exclui.
 // - A primeira conta que tocar em "Tornar-me coordenador" vira o coordenador; depois disso ninguém mais consegue.
+// - Modo Ao Vivo: todos leem a sala; só o coordenador muda a música. Quem entra pelo link só marca "estou aqui" (um horário).
 service cloud.firestore {
   match /databases/{database}/documents {
     function isAdmin() {
@@ -37,6 +38,16 @@ service cloud.firestore {
         && request.resource.data.musica.cifra is string && request.resource.data.musica.cifra.size() <= 60000
         && request.resource.data.enviadoEm == request.time;
       allow read, update, delete: if isAdmin();
+    }
+    match /aovivo/{sala} {
+      allow read: if sala.size() <= 40;
+      allow write: if isAdmin() && sala.size() <= 40;
+      match /pessoas/{aparelho} {
+        allow read, delete: if isAdmin();
+        allow create, update: if aparelho.size() <= 40
+          && request.resource.data.keys().hasOnly(['visto'])
+          && request.resource.data.visto == request.time;
+      }
     }
     match /{caminho=**} {
       allow read, write: if false;
