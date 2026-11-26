@@ -254,6 +254,8 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
 .modal{position:fixed;inset:0;z-index:60;background:rgba(10,10,20,.5);display:flex;align-items:center;justify-content:center;padding:16px}
 .modal .box{background:var(--surface);border-radius:var(--r);padding:18px;max-width:620px;width:100%;display:flex;flex-direction:column;gap:10px;max-height:90vh}
 .modal textarea{min-height:240px;flex:1}
+.faixa{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 20px);z-index:75;display:flex;align-items:center;gap:12px;background:var(--surface);border:1.5px solid var(--gold);border-radius:14px;padding:10px 10px 10px 16px;box-shadow:0 8px 28px rgba(0,0,0,.18);width:max-content;max-width:calc(100% - 24px);font-weight:500}
+@media (max-width:760px){ .faixa{bottom:calc(env(safe-area-inset-bottom,0px) + 72px);width:calc(100% - 24px);justify-content:space-between} }
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:.9rem;z-index:70;max-width:calc(100% - 32px);text-align:center}
 
 #impressao{display:none}
@@ -566,6 +568,7 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
 </div>
 <div class="modal" id="modal" hidden></div>
 <div class="toast" id="toast" role="status" hidden></div>
+<div class="faixa" id="faixaNova" role="status" hidden><span>Nova versão do portal disponível.</span><button class="btn pri" id="faixaBtn">Atualizar agora</button></div>
 
 <!-- pdf.js 3.11.174 (Mozilla, Apache-2.0): no site fica em vendor/; no arquivo offline vai embutido aqui -->
 <script id="dados-base" type="application/json">
@@ -790,6 +793,7 @@ function rota(){
   if(vistaAtual==='inicio' && v!=='inicio') rolagemInicio=window.scrollY;
   const voltandoDaMusica = vistaAtual==='musica' && v==='inicio';
   vistaAtual=v; fecharPastas(true);
+  if(v!=='nova' && NUVEM.igualarDepois) setTimeout(()=>igualarAoOficial(true),0);
   document.querySelectorAll('[data-view]').forEach(s=>s.hidden = s.id!=='v-'+v);
   document.querySelectorAll('nav.tabs a').forEach(a=>a.classList.toggle('on', a.dataset.tab===(v==='musica'?'inicio':v)));
   if(v==='inicio') renderBiblioteca();
@@ -904,6 +908,7 @@ function desenharVersao(m){
     if(NUVEM.ok){
       if(env && env.h===assinaturaM(m)) h+='<span class="hint">Enviada para aprovação em '+esc(new Date(env.t).toLocaleDateString('pt-BR'))+'. Aguardando o coordenador.</span>';
       else h+='<span class="row" style="gap:6px"><input type="text" id="vAutor" placeholder="Seu nome" value="'+esc(ls.get('autor',''))+'" style="width:140px;padding:5px 8px"><button class="btn pri small" id="vEnviar">Enviar para aprovação</button></span>';
+      h+='<span class="hint" style="flex-basis:100%">Esta mudança é temporária: some na próxima atualização do portal. Envie para aprovação para ela virar oficial.</span>';
     } else h+='<span class="hint">Para virar oficial, envie pelo site (com internet) ou em Compartilhar para o coordenador.</span>';
   }
   if(meioTom(st.transp)){
@@ -1056,7 +1061,8 @@ function renderRep(){
   ['#tocar','#tocarTela','#copiarLista','#enviarRep','#imprimirRep'].forEach(s=>$(s).disabled=!itens.length);
   renderSalvos(); atualizarBadge();
   const orig = repAberto();
-  $('#repInfo').innerHTML = orig ? 'Aberto: <b>'+esc(orig.nome)+'</b>'+(orig.doMinisterio?' · ★ do ministério':'')+'. Salvar atualiza este mesmo repertório.' : 'Repertório novo. Ao salvar, ele entra na lista de salvos.';
+  const membro = NUVEM.ok && !st.admin;
+  $('#repInfo').innerHTML = membro ? (orig&&orig.doMinisterio ? 'Repertório do ministério: <b>'+esc(orig.nome)+'</b>. Você pode mudar tom e ordem para tocar, mas volta ao oficial na próxima atualização.' : 'Os repertórios oficiais vêm do coordenador. O que você montar aqui é temporário.') : orig ? 'Aberto: <b>'+esc(orig.nome)+'</b>'+(orig.doMinisterio?' · ★ do ministério':'')+'. Salvar atualiza este mesmo repertório.' : 'Repertório novo. Ao salvar, ele entra na lista de salvos.';
   const pub = NUVEM.ok && st.admin;
   $('#salvarRep').textContent = orig ? (pub ? 'Salvar alterações para todos' : 'Salvar alterações') : (pub ? 'Salvar e publicar para todos' : 'Salvar este');
   $('#salvarNovo').hidden = !orig; $('#salvarNovo').textContent = pub ? 'Publicar como novo' : 'Salvar como novo';
@@ -1548,7 +1554,7 @@ function mostrarTexto(nome, conteudo){
   $('#mdFechar').onclick=()=>fecharModal();
 }
 function mostrarModal(){ const md=$('#modal'); if(md.hidden){ md.hidden=false; abrirCamada(fecharModal); } }
-function fecharModal(peloVoltar){ const md=$('#modal'); if(md.hidden) return; md.hidden=true; if(peloVoltar!==true) sairCamada(); }
+function fecharModal(peloVoltar){ const md=$('#modal'); if(md.hidden) return; md.hidden=true; if(peloVoltar!==true) sairCamada(); if(NUVEM.igualarDepois && $('#v-nova').hidden) setTimeout(()=>igualarAoOficial(true),0); }
 function copiar(txt,msg,el){
   const fallback=()=>{ if(el){ el.focus(); el.select(); toast('Selecionado. Use Copiar do seu aparelho.'); } else mostrarTexto('Texto', txt); };
   try{ navigator.clipboard.writeText(txt).then(()=>toast(msg), fallback); }catch(e){ fallback(); }
@@ -1661,7 +1667,7 @@ function renderDados(){
 $('#iGrupo').addEventListener('change', renderDados);
 
 /* ---------- Aprovação pelo site (Firebase) ---------- */
-const VERSAO_APP = 8;
+const VERSAO_APP = 9;
 const NUVEM = {ok:false, db:null, auth:null, user:null, admin:false, semAdmin:false, fila:[]};
 function assinaturaM(m){ const c=JSON.stringify([m.titulo,m.artista,m.tom,m.cifra,m.obs,locs(m)]); let h=0; for(let i=0;i<c.length;i++) h=(Math.imul(h,31)+c.charCodeAt(i))|0; return h; }
 function paraNuvem(m){ const c=JSON.parse(JSON.stringify(limpa(m))); delete c._excluida; delete c.atualizado; delete c.oficializadoEm; return c; }
@@ -1684,19 +1690,70 @@ async function iniciarNuvem(){
     NUVEM.db=firebase.firestore(); NUVEM.auth=firebase.auth(); NUVEM.ok=true;
   }catch(e){ return; }
   st.admin=false;
-  NUVEM.auth.onAuthStateChanged(async u=>{ NUVEM.user=u; await checarAdmin(); st.admin=NUVEM.admin; if(NUVEM.admin) carregarFila(); redesenhar(); });
+  NUVEM.auth.onAuthStateChanged(async u=>{
+    NUVEM.user=u; await checarAdmin(); st.admin=NUVEM.admin;
+    if(NUVEM.admin) ouvirFila(); else pararFila();
+    redesenhar(); ouvir();
+  });
   NUVEM.auth.getRedirectResult().catch(()=>{});
-  sincronizar(); redesenhar();
-  window.addEventListener('online', sincronizar);
-  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ sincronizar(); if(NUVEM.admin) carregarFila(); } });
+  redesenhar();
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && NUVEM.user && !NUVEM.adminConhecido){ checarAdmin().then(()=>{ st.admin=NUVEM.admin; redesenhar(); }); } });
+}
+/* Tempo real: o app escuta o banco de dados. O que o coordenador aprova ou publica chega sozinho a quem tem internet. */
+let OUVINDO=false;
+function ouvir(){
+  if(OUVINDO || !NUVEM.ok) return; OUVINDO=true;
+  NUVEM.db.collection('musicas').onSnapshot(snap=>{ if(snap.metadata && snap.metadata.fromCache) return; aplicarMusicas(snap); }, ()=>{});
+  NUVEM.db.collection('repertorios').onSnapshot(snap=>{ if(snap.metadata && snap.metadata.fromCache) return; aplicarReps(snap); }, ()=>{});
+}
+function aplicarReps(snap){
+  const lista=[];
+  snap.forEach(d=>{ const r=d.data(); lista.push({id:d.id, nome:String(r.nome||'Repertório'), data:String(r.data||''), itens:(r.itens||[]).map(i=>({id:String(i.id), s:+i.s||0}))}); });
+  const mudou = JSON.stringify(st.nuvem.reps||[]) !== JSON.stringify(lista);
+  st.nuvem.reps=lista; ls.set('nuvem',st.nuvem); NUVEM.recebeuReps=true;
+  igualarAoOficial(mudou);
+  if(mudou && !$('#v-repertorio').hidden) renderRep();
+}
+function aplicarMusicas(snap){
+  const tomAntes=new Map(); snap.forEach(d=>tomAntes.set(d.id, raizTom(porId(d.id))));
+  const novo={}; let ultimo=0;
+  snap.forEach(d=>{ const m=d.data(); const t=m.atualizadoEm&&m.atualizadoEm.toMillis?m.atualizadoEm.toMillis():0; delete m.atualizadoEm; m.id=d.id; novo[d.id]=m; if(t>ultimo) ultimo=t; });
+  const mudou = JSON.stringify(st.nuvem.musicas||{}) !== JSON.stringify(novo);
+  const primeira = !NUVEM.recebeuMusicas; NUVEM.recebeuMusicas=true;
+  st.nuvem.musicas=novo; st.nuvem.ultimo=ultimo; ls.set('nuvem',st.nuvem);
+  // edição local igual à nova versão oficial: some sozinha
+  const of=mapaOficial(); const antes=st.locais.length;
+  st.locais=st.locais.filter(x=>{ const o=of.get(x.id); return !(o && assinaturaM(o)===assinaturaM(x)); });
+  if(st.locais.length!==antes) salvarLocais();
+  if(st.admin) for(const [id,a] of tomAntes){ const b=raizTom(porId(id)); if(a>=0 && b>=0 && a!==b) ajustarReps(id, b-a); }
+  igualarAoOficial(mudou);
+  if(mudou){ redesenhar(); if(!primeira && !st.admin) toast('Músicas atualizadas pelo coordenador.'); }
+}
+/* Membros: a cada atualização vinda do banco, o aparelho fica igual ao oficial do coordenador.
+   Edições, músicas novas, exclusões e repertórios guardados só neste aparelho são temporários. */
+function igualarAoOficial(mudou){
+  if(st.admin || NUVEM.admin) return;
+  if(NUVEM.user && !NUVEM.adminConhecido) return;      // não deu para saber se é o coordenador: não apaga nada
+  if(!NUVEM.recebeuMusicas || !NUVEM.recebeuReps) return;
+  if(!$('#v-nova').hidden || !$('#modal').hidden){ NUVEM.igualarDepois=true; return; }
+  NUVEM.igualarDepois=false;
+  const tinha = st.locais.length + st.ocultas.length + st.salvos.length + st.repsOcultos.length + st.oficiais.length;
+  if(tinha){
+    st.locais=[]; st.ocultas=[]; st.salvos=[]; st.repsOcultos=[]; st.oficiais=[];
+    ls.set('musicas',[]); ls.set('ocultas',[]); ls.set('reps',[]); ls.set('repsOcultos',[]); ls.set('oficiais',[]);
+  }
+  const min=st.nuvem.reps||[];
+  let repMudou=false;
+  if(min.length){
+    const alvo = min.find(r=>r.id===st.rep.id) || [...min].sort((a,b)=>(b.data||'').localeCompare(a.data||''))[0];
+    const novo={id:alvo.id, nome:alvo.nome, data:alvo.data, itens:alvo.itens.map(i=>({...i}))};
+    if(JSON.stringify(novo)!==JSON.stringify({id:st.rep.id, nome:st.rep.nome, data:st.rep.data, itens:st.rep.itens})){ st.rep=novo; salvarRep(); repMudou=true; }
+  }
+  if(tinha || repMudou){ redesenhar(); if(!$('#v-repertorio').hidden) renderRep(); }
+  if(tinha) toast('Seu portal foi atualizado e está igual à versão oficial.');
 }
 async function sincronizarReps(){
-  try{
-    const snap=await NUVEM.db.collection('repertorios').get(); const lista=[];
-    snap.forEach(d=>{ const r=d.data(); lista.push({id:d.id, nome:String(r.nome||'Repertório'), data:String(r.data||''), itens:(r.itens||[]).map(i=>({id:String(i.id), s:+i.s||0}))}); });
-    const antes=JSON.stringify(st.nuvem.reps||[]), agora=JSON.stringify(lista);
-    if(antes!==agora){ st.nuvem.reps=lista; ls.set('nuvem',st.nuvem); if(!$('#v-repertorio').hidden) renderRep(); }
-  }catch(e){}
+  try{ aplicarReps(await NUVEM.db.collection('repertorios').get()); }catch(e){}
 }
 async function publicarRep(r){
   await NUVEM.db.collection('repertorios').doc(r.id).set({nome:r.nome, data:r.data||'', itens:r.itens.map(i=>({id:i.id, s:i.s||0})), atualizadoEm:firebase.firestore.FieldValue.serverTimestamp()});
@@ -1705,29 +1762,17 @@ async function publicarRep(r){
 async function apagarRep(id){ await NUVEM.db.collection('repertorios').doc(id).delete(); await sincronizarReps(); }
 async function sincronizar(){
   if(!NUVEM.ok || navigator.onLine===false) return;
-  sincronizarReps();
-  try{
-    let q=NUVEM.db.collection('musicas'); const desde=st.nuvem.ultimo||0;
-    if(desde) q=q.where('atualizadoEm','>',firebase.firestore.Timestamp.fromMillis(desde));
-    const snap=await q.get(); let n=0;
-    const tomAntes=new Map(); snap.forEach(d=>tomAntes.set(d.id, raizTom(porId(d.id))));
-    snap.forEach(d=>{ const m=d.data(); const t=m.atualizadoEm&&m.atualizadoEm.toMillis?m.atualizadoEm.toMillis():0; delete m.atualizadoEm; m.id=d.id; st.nuvem.musicas[d.id]=m; if(t>st.nuvem.ultimo) st.nuvem.ultimo=t; n++; });
-    if(n){
-      ls.set('nuvem',st.nuvem);
-      // edição local igual à nova versão oficial: some sozinha
-      const of=mapaOficial(); const antes=st.locais.length;
-      st.locais=st.locais.filter(x=>{ const o=of.get(x.id); return !(o && assinaturaM(o)===assinaturaM(x)); });
-      if(st.locais.length!==antes) salvarLocais();
-      for(const [id,a] of tomAntes){ const b=raizTom(porId(id)); if(a>=0 && b>=0 && a!==b) ajustarReps(id, b-a); }
-      redesenhar(); if(desde) toast(n+' música(s) atualizada(s) pelo coordenador.');
-    }
-  }catch(e){}
+  try{ aplicarMusicas(await NUVEM.db.collection('musicas').get()); }catch(e){}
 }
+let FILA_PARAR=null;
+function ouvirFila(){ if(FILA_PARAR) return; FILA_PARAR = NUVEM.db.collection('pendentes').orderBy('enviadoEm').onSnapshot(snap=>{ NUVEM.fila=[]; snap.forEach(d=>NUVEM.fila.push({id:d.id, ...d.data()})); renderAdminNuvem(); }, ()=>{ FILA_PARAR=null; }); }
+function pararFila(){ if(FILA_PARAR){ try{ FILA_PARAR(); }catch(e){} FILA_PARAR=null; } NUVEM.fila=[]; }
 async function checarAdmin(){
-  NUVEM.admin=false; NUVEM.semAdmin=false;
+  const eraAdmin=NUVEM.admin;
+  NUVEM.admin=false; NUVEM.semAdmin=false; NUVEM.adminConhecido=false;
   if(!NUVEM.user) return;
-  try{ const d=await NUVEM.db.doc('config/admin').get(); if(!d.exists) NUVEM.semAdmin=true; else NUVEM.admin = d.data().uid===NUVEM.user.uid; }
-  catch(e){ NUVEM.admin=false; }
+  try{ const d=await NUVEM.db.doc('config/admin').get(); if(!d.exists) NUVEM.semAdmin=true; else NUVEM.admin = d.data().uid===NUVEM.user.uid; NUVEM.adminConhecido=true; }
+  catch(e){ NUVEM.admin=eraAdmin; }
 }
 function renderAdminNuvem(){
   const u=NUVEM.user;
@@ -1833,14 +1878,15 @@ setTimeout(()=>{ (window.requestIdleCallback || (f=>f()))(()=>iniciarNuvem(), {t
 /* App instalável: funciona offline e se atualiza sozinho quando há internet (só no site, não no arquivo). */
 if('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !EMBUTIDO){
   const tinha = !!navigator.serviceWorker.controller;
-  navigator.serviceWorker.register('sw.js').then(r=>{ try{ r.update(); }catch(e){} }).catch(()=>{});
-  let recarregou=false;
-  navigator.serviceWorker.addEventListener('controllerchange', ()=>{
-    if(!tinha || recarregou) return; recarregou=true;
-    const ocupado = !$('#tela').hidden || !$('#play').hidden || !$('#v-nova').hidden;
-    if(ocupado) toast('Nova versão do portal baixada. Ela aparece na próxima vez que abrir.');
-    else { toast('Portal atualizado.'); setTimeout(()=>location.reload(), 800); }
-  });
+  navigator.serviceWorker.register('sw.js').then(r=>{
+    try{ r.update(); }catch(e){}
+    // procura versão nova ao voltar para o app e a cada 30 minutos
+    document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ try{ r.update(); }catch(e){} } });
+    setInterval(()=>{ try{ r.update(); }catch(e){} }, 30*60*1000);
+  }).catch(()=>{});
+  let avisou=false;
+  navigator.serviceWorker.addEventListener('controllerchange', ()=>{ if(!tinha || avisou) return; avisou=true; $('#faixaNova').hidden=false; });
+  $('#faixaBtn').onclick=()=>{ $('#faixaBtn').disabled=true; location.reload(); };
 }
 })();
 </script>
