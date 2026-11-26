@@ -337,6 +337,9 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
   .modal .box{max-height:calc(100dvh - 20px)}
   .play .bar{gap:6px}
   .tela .tbar .btn{min-height:38px}
+  .tela .tbar{flex-wrap:wrap;row-gap:4px}
+  .tela .tbar .ttl{flex-basis:100%}
+  .tela .tbar .ttl + .tom{margin-right:auto}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media print{
@@ -563,6 +566,7 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
   <div class="tbar">
     <div class="ttl"><span class="eyebrow" id="tlPos"></span><b id="tlTit"></b></div>
     <span class="tom"><button class="btn icon" id="tlMenos" aria-label="Baixar meio tom">−</button><output id="tlTom"></output><button class="btn icon" id="tlMais" aria-label="Subir meio tom">+</button></span>
+    <span class="tom"><button class="btn icon" id="tlFm" aria-label="Diminuir letra">A−</button><button class="btn icon" id="tlFp" aria-label="Aumentar letra">A+</button></span>
     <button class="btn" id="tlAnt" aria-label="Música anterior">←</button><button class="btn pri" id="tlProx" aria-label="Próxima música">→</button>
     <button class="btn" id="tlSair">Sair</button>
   </div>
@@ -1187,7 +1191,7 @@ function desenharTela(){
 function encaixar(){
   if($('#tela').hidden) return;
   const box=$('#tlBody'), c=$('#tlCifra');
-  box.classList.remove('rola'); c.style.columnCount=''; 
+  box.classList.remove('rola'); c.style.columnCount=''; c.style.columnFill=''; c.style.height=''; 
   const W=box.clientWidth - parseFloat(getComputedStyle(box).paddingLeft) - parseFloat(getComputedStyle(box).paddingRight);
   const H=box.clientHeight - parseFloat(getComputedStyle(box).paddingTop) - parseFloat(getComputedStyle(box).paddingBottom);
   const visiveis=[...c.querySelectorAll('.l')].filter(l=>!(st.semCifra && l.classList.contains('cl')));
@@ -1204,7 +1208,15 @@ function encaixar(){
     for(let k=0;k<12;k++){ const mid=(lo+hi)/2; if(cabe(cols,mid)) lo=mid; else hi=mid; }
     if(lo>melhor.fs+0.4) melhor={cols,fs:lo};
   }
-  if(!melhor.fs){ melhor={cols:1, fs:Math.max(10, Math.min(18, W/(maxLen*RATIO)))}; box.classList.add('rola'); c.style.height='auto'; } else c.style.height='';
+  if(!melhor.fs){ melhor={cols:1, fs:Math.max(10, Math.min(18, W/(maxLen*RATIO)))}; box.classList.add('rola'); c.style.height='auto'; c.style.columnFill='balance'; } else c.style.height='';
+  // A− / A+ da tela cheia: parte do tamanho que cabe e aumenta ou diminui; maior que cabe, a tela passa a rolar
+  const z=st.prefs.zoomTela||1;
+  if(z!==1){
+    const fs=Math.max(8, melhor.fs*z); let cols=melhor.cols;
+    if(z>1){ cols=1; for(let k=maxCols;k>=1;k--){ const colW=(W-(k-1)*GAP)/k; if(colW>=maxLen*RATIO*fs){ cols=k; break; } } box.classList.add('rola'); c.style.height='auto'; c.style.columnFill='balance'; }
+    melhor={cols, fs};
+  }
+  $('#tlFm').disabled = z<=0.6; $('#tlFp').disabled = z>=2.5;
   c.style.columnCount=melhor.cols; c.style.fontSize=Math.floor(melhor.fs*10)/10+'px';
 }
 window.addEventListener('resize', ()=>{ clearTimeout(tela.t); tela.t=setTimeout(encaixar,120); });
@@ -1214,6 +1226,9 @@ $('#tocarTela').onclick=()=>{ if(st.rep.itens.length) abrirTela(st.rep.itens,0,'
 $('#tlSair').onclick=()=>fecharTela();
 $('#tlMais').onclick=()=>{ tela.lista[tela.k].s++; if(tela.origem==='rep') salvarRep(); desenharTela(); };
 $('#tlMenos').onclick=()=>{ tela.lista[tela.k].s--; if(tela.origem==='rep') salvarRep(); desenharTela(); };
+function zoomTela(f){ let z=(st.prefs.zoomTela||1)*f; if(Math.abs(z-1)<0.05) z=1; st.prefs.zoomTela=Math.min(2.5,Math.max(0.6,z)); ls.set('prefs',st.prefs); encaixar(); }
+$('#tlFp').onclick=()=>zoomTela(1.15);
+$('#tlFm').onclick=()=>zoomTela(1/1.15);
 $('#tlProx').onclick=()=>{ if(tela.k<tela.lista.length-1){ tela.k++; desenharTela(); } };
 $('#tlAnt').onclick=()=>{ if(tela.k>0){ tela.k--; desenharTela(); } };
 document.addEventListener('keydown', e=>{
@@ -1226,6 +1241,7 @@ document.addEventListener('keydown', e=>{
 (function(){ let x0=null,y0=null; const b=$('#tlBody');
   b.addEventListener('touchstart',e=>{ x0=e.touches[0].clientX; y0=e.touches[0].clientY; },{passive:true});
   b.addEventListener('touchend',e=>{ if(x0==null) return; const dx=e.changedTouches[0].clientX-x0, dy=e.changedTouches[0].clientY-y0; x0=null;
+    if(b.scrollWidth>b.clientWidth+2) return;   // letra maior que a tela: deslizar rola para o lado, não troca de música
     if(Math.abs(dx)>60 && Math.abs(dx)>Math.abs(dy)*1.5){ (dx<0?$('#tlProx'):$('#tlAnt')).click(); } },{passive:true});
 })();
 
@@ -1670,7 +1686,7 @@ function renderDados(){
 $('#iGrupo').addEventListener('change', renderDados);
 
 /* ---------- Aprovação pelo site (Firebase) ---------- */
-const VERSAO_APP = 10;
+const VERSAO_APP = 11;
 const NUVEM = {ok:false, db:null, auth:null, user:null, admin:false, semAdmin:false, fila:[]};
 function assinaturaM(m){ const c=JSON.stringify([m.titulo,m.artista,m.tom,m.cifra,m.obs,locs(m)]); let h=0; for(let i=0;i<c.length;i++) h=(Math.imul(h,31)+c.charCodeAt(i))|0; return h; }
 function paraNuvem(m){ const c=JSON.parse(JSON.stringify(limpa(m))); delete c._excluida; delete c.atualizado; delete c.oficializadoEm; return c; }
