@@ -6,9 +6,13 @@ Site: https://dal-antunes.github.io/portal-cifras/
 
 - Abra o link no celular e use **Adicionar à tela inicial**. Depois disso o portal funciona sem internet.
 - Quando houver internet, o portal baixa sozinho a versão nova.
-- Para atualizar as músicas oficiais: no portal, em **Compartilhar → Modo coordenador**, use **Gerar portal atualizado** e substitua o arquivo `index.html` deste repositório pelo arquivo gerado.
+- As músicas oficiais mudam pela aprovação no próprio portal (veja abaixo), sem mexer nos arquivos.
 
-O arquivo `index.html` também funciona sozinho, aberto direto do aparelho, sem internet.
+## Arquivos
+
+- `index.html`: o portal. As fontes (`vendor/fontes.css`) e o leitor de PDF (`vendor/pdf.js`, `vendor/pdf.worker.js`) ficam separados para o celular abrir rápido; o app guarda tudo no aparelho.
+- Para quem quer um arquivo único sem o site, **Compartilhar → Gerar portal atualizado** monta um `portal-cifras.html` com tudo dentro, que abre direto do aparelho, sem internet.
+- Ao mudar `vendor/fontes.css` ou o pdf.js, troque `LIBS` em `sw.js` para os aparelhos baixarem de novo.
 
 ## Aprovação de músicas
 
