@@ -327,6 +327,8 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
   .seq .ctr{width:100%;justify-content:flex-start;padding-left:0;gap:6px}
   .seq .handle{display:none}
   .rep .card:last-child{order:-1}
+  #fila .s{flex-wrap:wrap}
+  #fila .s div{flex:1 1 100%}
   .fontes .btn{white-space:normal;text-align:left}
   .stat{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   .hero p{display:none}
@@ -516,7 +518,7 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
   <!-- COMPARTILHAR / BACKUP -->
   <section id="v-dados" data-view hidden>
     <h1 style="margin-bottom:6px">Compartilhar e guardar</h1>
-    <p class="muted" style="margin:0 0 18px;max-width:68ch">Tudo funciona sem internet. As músicas que vêm no portal estão dentro deste arquivo. As que você adiciona ficam salvas neste aparelho e navegador. Para passar para os colegas, envie um arquivo pelo WhatsApp ou Drive.</p>
+    <p class="muted" style="margin:0 0 18px;max-width:68ch">Tudo funciona sem internet, com a última versão recebida. Com internet, as músicas e os repertórios oficiais chegam sozinhos. Músicas novas ou editadas vão para o coordenador pelo botão Enviar para aprovação.</p>
       <div class="card" id="cFila" hidden style="margin-bottom:16px">
       <div class="row"><h3 style="margin-right:auto">Aprovações pendentes</h3><button class="btn small" id="filaAtualizar">Atualizar</button></div>
       <div id="fila" class="saved"></div>
@@ -908,7 +910,7 @@ function desenharVersao(m){
     if(NUVEM.ok){
       if(env && env.h===assinaturaM(m)) h+='<span class="hint">Enviada para aprovação em '+esc(new Date(env.t).toLocaleDateString('pt-BR'))+'. Aguardando o coordenador.</span>';
       else h+='<span class="row" style="gap:6px"><input type="text" id="vAutor" placeholder="Seu nome" value="'+esc(ls.get('autor',''))+'" style="width:140px;padding:5px 8px"><button class="btn pri small" id="vEnviar">Enviar para aprovação</button></span>';
-      h+='<span class="hint" style="flex-basis:100%">Esta mudança é temporária: some na próxima atualização do portal. Envie para aprovação para ela virar oficial.</span>';
+      h+='<span class="hint" style="flex-basis:100%">'+(env && env.h===assinaturaM(m) ? 'Enquanto o coordenador não aprova, esta versão fica só neste aparelho e some na próxima atualização do portal.' : 'Esta mudança é temporária: some na próxima atualização do portal. Envie para aprovação para ela virar oficial.')+'</span>';
     } else h+='<span class="hint">Para virar oficial, envie pelo site (com internet) ou em Compartilhar para o coordenador.</span>';
   }
   if(meioTom(st.transp)){
@@ -1796,7 +1798,7 @@ $('#gEntrar').onclick=async()=>{
 };
 $('#gSair').onclick=()=>{ NUVEM.auth.signOut(); };
 $('#gTornar').onclick=async()=>{
-  try{ await NUVEM.db.doc('config/admin').set({uid:NUVEM.user.uid, email:NUVEM.user.email||'', criadoEm:firebase.firestore.FieldValue.serverTimestamp()}); await checarAdmin(); st.admin=NUVEM.admin; carregarFila(); toast('Pronto, você é o coordenador.'); redesenhar(); }
+  try{ await NUVEM.db.doc('config/admin').set({uid:NUVEM.user.uid, email:NUVEM.user.email||'', criadoEm:firebase.firestore.FieldValue.serverTimestamp()}); await checarAdmin(); st.admin=NUVEM.admin; ouvirFila(); toast('Pronto, você é o coordenador.'); redesenhar(); }
   catch(e){ toast('Já existe um coordenador. '+erroNuvem(e)); await checarAdmin(); redesenhar(); }
 };
 async function enviarAprovacao(m){
