@@ -205,6 +205,19 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
 .quickres button{all:unset;display:flex;gap:8px;align-items:center;padding:8px 10px;cursor:pointer;width:calc(100% - 20px);font-size:.92rem}
 .quickres button:hover,.quickres button:focus-visible{background:var(--sunk)}
 .faixaTeste{background:#1f5f7a;color:#fff;text-align:center;font-size:.78rem;font-weight:600;letter-spacing:.02em;padding:5px 10px}
+.songhead .hist{display:block;margin-top:4px;padding:0;border:0;background:none;font:inherit;font-size:.8rem;color:var(--muted);cursor:pointer;text-align:left}
+.songhead .hist:hover{text-decoration:underline}
+#tlAval.feito{color:var(--muted)}
+.avopc{display:flex;flex-direction:column;gap:6px}
+.avopc .btn{justify-content:flex-start;padding:11px 14px;white-space:normal;text-align:left}
+.avopc .btn small{color:var(--muted);margin-left:auto}
+.histlista{list-style:none;margin:0;padding:0;overflow:auto;display:flex;flex-direction:column}
+.histlista li{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line);font-size:.9rem}
+.histlista li:first-child{border-top:0}
+.histlista .d{color:var(--muted);flex:none;width:84px}
+.histlista .x{flex:1;min-width:0}
+.histlista .o{color:var(--muted);font-size:.84rem}
+.histlista button{flex:none;border:0;background:none;color:var(--muted);cursor:pointer;font-size:.8rem;padding:2px 4px}
 .rephead{display:flex;gap:8px;align-items:flex-start;margin-bottom:12px}
 .rephead .repaberto{flex:1;margin:0}
 .repmenu{position:relative;flex:none}
@@ -430,6 +443,7 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
         <div class="eyebrow" id="sEyebrow"></div>
         <h1 id="sTitulo"></h1>
         <div class="meta" id="sMeta"></div>
+        <button class="hist" id="sHist" hidden></button>
       </div>
       <div class="versao" id="sVersao"></div>
       <div class="tagbox">
@@ -606,6 +620,7 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
     <span class="tom"><button class="btn icon" id="tlFm" aria-label="Diminuir letra">A−</button><button class="btn icon" id="tlFp" aria-label="Aumentar letra">A+</button></span>
     <button class="btn" id="tlAnt" aria-label="Música anterior">←</button><button class="btn pri" id="tlProx" aria-label="Próxima música">→</button>
     <button class="btn" id="tlVivo" hidden aria-label="Transmitir ao vivo">📡 Ao vivo</button>
+    <button class="btn" id="tlAval" hidden title="Avaliar como foi esta música">Avaliar</button>
     <button class="btn" id="tlSair">Sair</button>
   </div>
   <div class="vivobar" id="vivoBar" hidden><span class="tx" id="vbTxt"></span><span id="vbBtns"></span></div>
@@ -932,7 +947,7 @@ function abrirMusica(id){
   $('#sMeta').innerHTML = (m.artista?'<span>'+esc(m.artista)+'</span>':'') + (tomBase(m)?'<span>Tom original <span class="key">'+esc(tomBase(m))+'</span></span>':'') + (m.origem!=='base'?'<span class="tag local">'+(m.origem==='editada'?'editada aqui':'só neste aparelho')+'</span>':'') + (m.revisar?'<span class="tag rev">revisar acordes</span>':'');
   $('#excluir').textContent = 'Excluir';
   $('#sTagAdd').hidden = true;
-  desenharTags(m); desenharVersao(m);
+  desenharTags(m); desenharVersao(m); desenharHist(m);
   desenharMusica();
 }
 /* Tags (pastas, temas e momentos) da música aberta */
@@ -1241,7 +1256,7 @@ function desenharTela(){
   if(vivoM && VIVO.ultimo && VIVO.ultimo.prox){ const nx=document.createElement('span'); nx.className='l sec'; nx.textContent='A seguir: '+VIVO.ultimo.prox; c.append(nx); }
   encaixar();
   if(VIVO.papel==='coord' && !vivoM) enviarVivo();
-  atualizarVivoUI();
+  atualizarVivoUI(); botaoAval();
 }
 function encaixar(){
   if($('#tela').hidden) return;
@@ -1287,6 +1302,89 @@ $('#tlFp').onclick=()=>zoomTela(1.15);
 $('#tlFm').onclick=()=>zoomTela(1/1.15);
 $('#tlProx').onclick=()=>{ if(tela.k<tela.lista.length-1){ tela.k++; desenharTela(); } };
 $('#tlAnt').onclick=()=>{ if(tela.k>0){ tela.k--; desenharTela(); } };
+/* ---------- Avaliação e histórico das músicas ----------
+   Na Tela cheia em sequência, o coordenador avalia como foi cada música (bem / razoável / problema).
+   Cada avaliação conta como uma vez tocada e já passa para a próxima. Todos veem o histórico, discreto, na página da música.
+   Banco: avaliacoes/<data>_<música> = {musicaId, nota, obs, data, rep, em}. Avaliar de novo no mesmo dia substitui. */
+const NOTAS={bem:'Bem executada', ok:'Razoável', ruim:'Tivemos problema'};
+st.aval = ls.get('aval',{});            // cópia do banco: {musicaId:[{d,n,o,r}]}
+st.avalFila = ls.get('avalFila',[]);    // avaliações feitas sem internet, esperando para subir
+function hojeISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function avalDe(id){
+  const mapa=new Map(((st.aval||{})[id]||[]).map(a=>[a.d,a]));
+  for(const f of (st.avalFila||[])) if(f.musicaId===id){ if(f.apagar) mapa.delete(f.data); else mapa.set(f.data,{d:f.data,n:f.nota,o:f.obs,r:f.rep}); }
+  return [...mapa.values()].sort((a,b)=>b.d.localeCompare(a.d));
+}
+function resumoAval(id){
+  const h=avalDe(id); if(!h.length) return null;
+  const pts={bem:2,ok:1,ruim:0}; const ult=h.slice(0,5); const media=ult.reduce((t,a)=>t+(pts[a.n]??1),0)/ult.length;
+  return {vezes:h.length, ultima:h[0].d, facilidade: media>=1.5?'boa':media>=0.8?'média':'pede ensaio', h};
+}
+function podeAvaliar(){ return NUVEM.ok && !!NUVEM.user && (NUVEM.admin || ls.get('coordUid','')===NUVEM.user.uid); }
+function aplicarAval(snap){
+  const novo={};
+  snap.forEach(d=>{ const a=d.data(); const id=String(a.musicaId||''); if(!id||!NOTAS[a.nota]) return; (novo[id]=novo[id]||[]).push({d:String(a.data||''), n:a.nota, o:String(a.obs||''), r:String(a.rep||'')}); });
+  if(JSON.stringify(novo)===JSON.stringify(st.aval)) return;
+  st.aval=novo; ls.set('aval',novo);
+  if(!$('#v-musica').hidden && st.atual) desenharHist(porId(st.atual));
+}
+async function subirAval(){
+  if(!NUVEM.ok || !st.avalFila.length || navigator.onLine===false) return;
+  for(const f of [...st.avalFila]){
+    const ref=NUVEM.db.collection('avaliacoes').doc(f.data+'_'+f.musicaId);
+    try{
+      if(f.apagar) await ref.delete();
+      else await ref.set({musicaId:f.musicaId, nota:f.nota, obs:f.obs, data:f.data, rep:f.rep, em:firebase.firestore.FieldValue.serverTimestamp()});
+      st.avalFila=st.avalFila.filter(x=>x!==f); ls.set('avalFila',st.avalFila);
+    }catch(e){ if(e && e.code==='permission-denied'){ st.avalFila=st.avalFila.filter(x=>x!==f); ls.set('avalFila',st.avalFila); } else return; }
+  }
+}
+window.addEventListener('online', ()=>subirAval());
+function guardarAval(item){
+  st.avalFila=st.avalFila.filter(x=>!(x.musicaId===item.musicaId && x.data===item.data)); st.avalFila.push(item); ls.set('avalFila',st.avalFila);
+  subirAval();
+}
+function botaoAval(){
+  const b=$('#tlAval'); const it=tela.lista[tela.k];
+  b.hidden = !(tela.origem==='rep' && it && podeAvaliar());
+  if(b.hidden) return;
+  const hoje=avalDe(it.id).find(a=>a.d===hojeISO());
+  b.textContent = hoje ? 'Avaliada ✓' : 'Avaliar'; b.classList.toggle('feito', !!hoje);
+}
+$('#tlAval').onclick=()=>{
+  const it=tela.lista[tela.k]; const m=it&&porId(it.id); if(!m) return;
+  const hoje=avalDe(m.id).find(a=>a.d===hojeISO());
+  const md=$('#modal');
+  md.innerHTML='<div class="box" role="dialog" aria-modal="true" aria-label="Avaliar música"><h3>Como foi “'+esc(m.titulo)+'”?</h3>'
+    +(hoje?'<p class="hint" style="margin:0">Já avaliada hoje: '+esc(NOTAS[hoje.n])+'. Escolher de novo substitui.</p>':'')
+    +'<div class="field" style="margin:0"><input type="text" id="avObs" maxlength="300" placeholder="Observação (opcional), ex.: entrada atrasou" value="'+esc(hoje&&hoje.o||'')+'"></div>'
+    +'<div class="avopc">'+Object.entries(NOTAS).map(([k,t])=>'<button class="btn" data-nota="'+k+'">'+t+'</button>').join('')+'</div>'
+    +'<div class="row"><button class="btn" id="avCancel">Cancelar</button></div></div>';
+  mostrarModal();
+  $('#avCancel').onclick=()=>fecharModal();
+  md.querySelectorAll('[data-nota]').forEach(btn=>btn.onclick=()=>{
+    guardarAval({musicaId:m.id, nota:btn.dataset.nota, obs:$('#avObs').value.trim().slice(0,300), data:hojeISO(), rep:String(st.rep.nome||'').slice(0,120)});
+    fecharModal();
+    if(tela.k<tela.lista.length-1){ tela.k++; desenharTela(); toast('Avaliada. Próxima música.'); }
+    else { botaoAval(); toast('Avaliada. Era a última do repertório.'); }
+  });
+};
+function desenharHist(m){
+  const b=$('#sHist'); const r=m&&resumoAval(m.id);
+  b.hidden=!r; if(!r) return;
+  b.textContent='Tocada '+r.vezes+'× · última em '+dataBR(r.ultima)+' · facilidade '+r.facilidade;
+}
+$('#sHist').onclick=()=>{
+  const m=porId(st.atual); const r=m&&resumoAval(m.id); if(!r) return;
+  const adm=podeAvaliar(); const md=$('#modal');
+  md.innerHTML='<div class="box" role="dialog" aria-modal="true" aria-label="Histórico"><h3>Histórico · '+esc(m.titulo)+'</h3>'
+    +'<p class="hint" style="margin:0">Tocada '+r.vezes+'× · facilidade '+r.facilidade+' (pelas últimas '+Math.min(5,r.vezes)+' vezes)</p>'
+    +'<ul class="histlista">'+r.h.map(a=>'<li><span class="d">'+esc(dataBR(a.d))+'</span><span class="x">'+esc(NOTAS[a.n]||'')+(a.r?' · '+esc(a.r):'')+(a.o?'<div class="o">'+esc(a.o)+'</div>':'')+'</span>'+(adm?'<button data-apagar="'+esc(a.d)+'" title="Apagar esta avaliação">apagar</button>':'')+'</li>').join('')+'</ul>'
+    +'<div class="row"><button class="btn" id="hFechar">Fechar</button></div></div>';
+  mostrarModal();
+  $('#hFechar').onclick=()=>fecharModal();
+  md.querySelectorAll('[data-apagar]').forEach(x=>x.onclick=()=>{ guardarAval({musicaId:m.id, data:x.dataset.apagar, apagar:true}); fecharModal(); desenharHist(m); toast('Avaliação apagada.'); });
+};
 document.addEventListener('keydown', e=>{
   if($('#tela').hidden) return;
   if(['ArrowRight','PageDown','ArrowDown',' '].includes(e.key)){ e.preventDefault(); $('#tlProx').click(); }
@@ -1925,7 +2023,7 @@ function renderDados(){
 $('#iGrupo').addEventListener('change', renderDados);
 
 /* ---------- Aprovação pelo site (Firebase) ---------- */
-const VERSAO_APP = 17;
+const VERSAO_APP = 18;
 const NUVEM = {ok:false, db:null, auth:null, user:null, admin:false, semAdmin:false, fila:[]};
 function assinaturaM(m){ const c=JSON.stringify([m.titulo,m.artista,m.tom,m.cifra,m.obs,locs(m)]); let h=0; for(let i=0;i<c.length;i++) h=(Math.imul(h,31)+c.charCodeAt(i))|0; return h; }
 function paraNuvem(m){ const c=JSON.parse(JSON.stringify(limpa(m))); delete c._excluida; delete c.atualizado; delete c.oficializadoEm; return c; }
@@ -1963,6 +2061,7 @@ function ouvir(){
   if(OUVINDO || !NUVEM.ok) return; OUVINDO=true;
   NUVEM.db.collection('musicas').onSnapshot(snap=>{ if(snap.metadata && snap.metadata.fromCache) return; aplicarMusicas(snap); }, ()=>{});
   NUVEM.db.collection('repertorios').onSnapshot(snap=>{ if(snap.metadata && snap.metadata.fromCache) return; aplicarReps(snap); }, ()=>{});
+  NUVEM.db.collection('avaliacoes').onSnapshot(snap=>{ if(snap.metadata && snap.metadata.fromCache) return; aplicarAval(snap); }, ()=>{});
 }
 function aplicarReps(snap){
   const lista=[];
@@ -2029,7 +2128,7 @@ async function checarAdmin(){
   const eraAdmin=NUVEM.admin;
   NUVEM.admin=false; NUVEM.semAdmin=false; NUVEM.adminConhecido=false;
   if(!NUVEM.user) return;
-  try{ const d=await NUVEM.db.doc('config/admin').get(); if(!d.exists) NUVEM.semAdmin=true; else NUVEM.admin = d.data().uid===NUVEM.user.uid; NUVEM.adminConhecido=true; }
+  try{ const d=await NUVEM.db.doc('config/admin').get(); if(!d.exists) NUVEM.semAdmin=true; else NUVEM.admin = d.data().uid===NUVEM.user.uid; NUVEM.adminConhecido=true; ls.set('coordUid', NUVEM.admin?NUVEM.user.uid:''); if(NUVEM.admin) subirAval(); }
   catch(e){ NUVEM.admin=eraAdmin; }
 }
 function renderAdminNuvem(){

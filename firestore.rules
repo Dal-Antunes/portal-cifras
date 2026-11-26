@@ -5,6 +5,7 @@ rules_version = '2';
 // - Todos leem os repertórios publicados; só o coordenador publica ou apaga.
 // - Só o coordenador (a conta Google gravada em config/admin) aprova, recusa, edita ou exclui.
 // - A primeira conta que tocar em "Tornar-me coordenador" vira o coordenador; depois disso ninguém mais consegue.
+// - Avaliações: todos leem o histórico; só o coordenador avalia.
 // - Modo Ao Vivo: todos leem a sala; só o coordenador muda a música. Quem entra pelo link só marca "estou aqui" (um horário).
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -27,6 +28,19 @@ service cloud.firestore {
     match /repertorios/{id} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+    // Avaliação das músicas (Tela cheia em sequência): todos leem o histórico; só o coordenador avalia ou apaga.
+    match /avaliacoes/{id} {
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['musicaId', 'nota', 'obs', 'data', 'rep', 'em'])
+        && request.resource.data.musicaId is string && request.resource.data.musicaId.size() <= 40
+        && request.resource.data.nota in ['bem', 'ok', 'ruim']
+        && request.resource.data.obs is string && request.resource.data.obs.size() <= 300
+        && request.resource.data.data is string && request.resource.data.data.size() == 10
+        && request.resource.data.rep is string && request.resource.data.rep.size() <= 120
+        && id == request.resource.data.data + '_' + request.resource.data.musicaId;
+      allow delete: if isAdmin();
     }
     match /pendentes/{id} {
       allow create: if request.resource.data.keys().hasOnly(['tipo', 'musicaId', 'musica', 'autor', 'enviadoEm'])

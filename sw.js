@@ -5,7 +5,7 @@
 // A homologação (ramo dev, em /homolog/) fica no mesmo endereço do GitHub, então usa caches com outro nome para não apagar os do portal oficial.
 const PREFIXO = self.registration.scope.includes('/homolog/') ? 'teste-' : '';
 const HOMOLOG = new URL('./homolog/', self.registration.scope).pathname;
-const VERSAO = PREFIXO + 'cifras-2026-11-26-17';
+const VERSAO = PREFIXO + 'cifras-2026-11-26-18';
 const LIBS = PREFIXO + 'cifras-libs-1';
 const ARQUIVOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './firebase-config.js'];
 const BIBLIOTECAS = ['./vendor/fontes.css', './vendor/firebase-app-compat.js', './vendor/firebase-auth-compat.js',
