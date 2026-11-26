@@ -2,8 +2,10 @@
 // Página: abre na hora com a cópia guardada e, se houver internet, busca a versão nova por trás
 // (antes esperava a internet até 4 segundos, o que parecia travado com sinal fraco).
 // Bibliotecas grandes (fontes, banco de dados, leitor de PDF) ficam num cache que não é apagado a cada versão.
-const VERSAO = 'cifras-2026-11-26-15';
-const LIBS = 'cifras-libs-1';
+// A base de testes (/portal-cifras-teste/) fica no mesmo endereço do GitHub, então usa caches com outro nome para não apagar os do portal oficial.
+const PREFIXO = self.registration.scope.includes('/portal-cifras-teste/') ? 'teste-' : '';
+const VERSAO = PREFIXO + 'cifras-2026-11-26-16';
+const LIBS = PREFIXO + 'cifras-libs-1';
 const ARQUIVOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './firebase-config.js'];
 const BIBLIOTECAS = ['./vendor/fontes.css', './vendor/firebase-app-compat.js', './vendor/firebase-auth-compat.js',
   './vendor/firebase-firestore-compat.js', './vendor/pdf.js', './vendor/pdf.worker.js'];
@@ -18,7 +20,7 @@ self.addEventListener('install', e => {
   })());
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSAO && k !== LIBS).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith(PREFIXO + 'cifras-') && k !== VERSAO && k !== LIBS).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
 async function paginaNova(cache) {

@@ -204,6 +204,7 @@ textarea{font-family:var(--f-mono);font-size:.88rem;line-height:1.45;resize:vert
 .quickres{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--surface);border:1px solid var(--line);border-radius:8px;max-height:280px;overflow:auto;z-index:5;box-shadow:0 8px 24px rgba(0,0,0,.12)}
 .quickres button{all:unset;display:flex;gap:8px;align-items:center;padding:8px 10px;cursor:pointer;width:calc(100% - 20px);font-size:.92rem}
 .quickres button:hover,.quickres button:focus-visible{background:var(--sunk)}
+.faixaTeste{background:#1f5f7a;color:#fff;text-align:center;font-size:.78rem;font-weight:600;letter-spacing:.02em;padding:5px 10px}
 .rephead{display:flex;gap:8px;align-items:flex-start;margin-bottom:12px}
 .rephead .repaberto{flex:1;margin:0}
 .repmenu{position:relative;flex:none}
@@ -636,9 +637,13 @@ const COR_PASTA = {'Advento':'--lit-roxo','Quaresma':'--lit-roxo','Natal':'--lit
 const corDe = p => COR_PASTA[p] ? 'var('+COR_PASTA[p]+')' : 'var(--muted)';
 
 /* ---------- Armazenamento local (protegido) ---------- */
+/* Base de testes (site em /portal-cifras-teste/): faixa no topo e dados guardados à parte, para não misturar com o portal oficial no mesmo aparelho. */
+const TESTE = /\/portal-cifras-teste\//.test(location.pathname);
+const LSP = TESTE ? 'pct.' : 'pc.';
+if(TESTE){ document.title='TESTE · '+document.title; const f=document.createElement('div'); f.className='faixaTeste'; f.textContent='VERSÃO DE TESTE · o que muda aqui não vale para o ministério'; document.body.prepend(f); }
 const ls = {
-  get(k,d){ try{ const v = localStorage.getItem('pc.'+k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } },
-  set(k,v){ invalidar(); try{ localStorage.setItem('pc.'+k, JSON.stringify(v)); return true; }catch(e){ toast('Não foi possível salvar neste navegador. Exporte suas músicas para não perder.'); return false; } }
+  get(k,d){ try{ const v = localStorage.getItem(LSP+k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k,v){ invalidar(); try{ localStorage.setItem(LSP+k, JSON.stringify(v)); return true; }catch(e){ toast('Não foi possível salvar neste navegador. Exporte suas músicas para não perder.'); return false; } }
 };
 
 let BASE = {musicas:[]};
@@ -1920,7 +1925,7 @@ function renderDados(){
 $('#iGrupo').addEventListener('change', renderDados);
 
 /* ---------- Aprovação pelo site (Firebase) ---------- */
-const VERSAO_APP = 15;
+const VERSAO_APP = 16;
 const NUVEM = {ok:false, db:null, auth:null, user:null, admin:false, semAdmin:false, fila:[]};
 function assinaturaM(m){ const c=JSON.stringify([m.titulo,m.artista,m.tom,m.cifra,m.obs,locs(m)]); let h=0; for(let i=0;i<c.length;i++) h=(Math.imul(h,31)+c.charCodeAt(i))|0; return h; }
 function paraNuvem(m){ const c=JSON.parse(JSON.stringify(limpa(m))); delete c._excluida; delete c.atualizado; delete c.oficializadoEm; return c; }
